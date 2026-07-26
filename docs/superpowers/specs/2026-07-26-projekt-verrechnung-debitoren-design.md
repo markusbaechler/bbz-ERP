@@ -36,15 +36,22 @@ v1 löst **diesen Finanz-Kern** ab — nicht den Teilnehmer-/Seminar-/CRM-Teil.
 
 | Schicht | Wahl | Begründung |
 |---|---|---|
-| **Datenbank** | PostgreSQL, **Hosting Schweiz** (Exoscale CH oder Infomaniak) | Relationale Integrität, Finanz-Transaktionen, CH-Datenstandort (zwingend) |
-| **Backend/API** | Node.js (TypeScript), schlankes API (z. B. Fastify) | Fortlaufende Rg-Nummern, MWSt-/QR-Berechnung, Referenz-Generierung **serverseitig** = korrekt & manipulationssicher |
+| **Datenbank** | **Azure Database for PostgreSQL (Flexible Server), Region „Switzerland North" (Zürich)** | Relationale Integrität + Transaktionen; **lückenlose/unveränderliche Rg-Nummerierung** via Sequenz/Constraint; CH-Datenstandort; managed = wenig Betrieb; bleibt in der bestehenden Microsoft/Azure-Welt |
+| **Backend/API** | Node.js (TypeScript), schlankes API (Azure Functions oder kleiner App Service, Switzerland North) | Nummernvergabe, MWSt-/QR-Berechnung, Referenz-Generierung, Saldo-Updates **serverseitig in DB-Transaktionen** = korrekt & manipulationssicher |
 | **Frontend** | PWA, vanilla-nah (konsistent zu `crm-spa`), optional leichtes Rendering-Helferlein | Internes Tool, wenige Nutzer; kein grosser Framework-Lernaufwand |
+| **Auth/Rollen** | **Entra ID (Azure AD) via MSAL** — gleiche Identität wie `crm-spa`; Rollen **Admin/Standard** | Kein neuer Identity-Stack; spiegelt heutige „Mitarbeitende"-Zugriffsverwaltung |
 | **QR-Rechnung** | Library `swissqrbill` | SIX-/ISO-20022-konformer Zahlteil/Empfangsschein als PDF/SVG; de-riskt das Muss-Kriterium |
 | **PDF** | serverseitige Generierung (Rechnungsbrief + QR-Seite) | Reproduziert heutiges Layout |
-| **Auth/Rollen** | Session-basiert, Rollen **Admin/Standard** | Spiegelt heutige „Mitarbeitende"-Zugriffsverwaltung |
-| **Betrieb** | 1 CH-VPS (App+API) + managed/self-hosted Postgres (CH), tägliche Backups | Kleines Team, einfacher Betrieb |
+| **Dokumentablage** | SharePoint/OneDrive (CH-Tenant) für PDF-Archiv | Nutzt bestehende M365-Welt — **aber nicht** als Finanz-Datenspeicher |
+| **Betrieb** | Managed Postgres + Functions/App Service (Switzerland North), autom. Backups | Kleines Team, minimaler Betrieb |
 
-**Datenstandort:** Alle Daten (DB, Backups, PDF-Ablage) in der **Schweiz**. Kein Transfer in Nicht-CH-Clouds.
+**Datenstandort:** Alle Daten (DB, Backups, PDF-Ablage) in der **Schweiz**. Kein Transfer in Nicht-CH-Regionen.
+
+### 3.1 Warum relationale DB — und nicht SharePoint/Excel als Speicher
+Geprüfte Alternative (Nutzerfrage): v1 auf **MS Lists/Excel** hosten, später migrieren. Entscheidung dagegen für den **Finanz-Kern**:
+- **Excel** ist kein transaktionaler Mehrbenutzer-Speicher → als System of Record für Rechnungen ungeeignet (nur als Export/Report-Ziel).
+- **MS Lists** kennen **keine Transaktionen** (Rechnung+Positionen+Saldo nicht atomar), **keine erzwungene lückenlose Nummerierung** (Race bei gleichzeitigen Nutzern) und rechnen Saldi clientseitig (schwach ab ~5000 Einträgen). Bei **striktem, revisions-/MWSt-konformem Nummernzwang** (Nutzer-Entscheid) müsste man ohnehin eine Server-Zählkomponente bauen — und hätte trotzdem keinen transaktionalen Speicher.
+- **Azure Postgres (Switzerland North)** liefert dasselbe M365-/CH-Umfeld, aber mit echter Integrität. **Portabilität** bleibt: Standard-Postgres + Repository/Adapter-Muster → später zu jedem Host migrierbar.
 
 ## 4. Datenmodell (v1)
 
@@ -152,7 +159,7 @@ projekt.projektleitung → mitarbeitende ; projekt.fortsetzung_von → projekt
 
 ## 6. Geschäftsregeln (kritisch)
 
-1. **Rechnungsnummer** lückenlos fortlaufend, serverseitig, unveränderlich nach Festschreibung.
+1. **Rechnungsnummer** **strikt lückenlos** fortlaufend (DB-Sequenz + Unique-Constraint, Vergabe in Transaktion), **unveränderlich** nach Festschreibung — revisions-/MWSt-konform (Nutzer-Anforderung). Storno erzeugt Storno-Beleg, keine Löschung/Lücke.
 2. **QR-Referenz** eindeutig je Rechnung, aus `lfd_nr` deterministisch + Mod10-Prüfziffer.
 3. **MWSt** je Position; Summierung je Satz; Rappenrundung; historisierte Sätze (Beleg-Datum bestimmt gültigen Satz).
 4. **Festschreibung** (`abgerechnet`): Kopf/Positionen/Nummer/QR eingefroren; Änderungen nur via Storno + Neu.
@@ -185,7 +192,8 @@ projekt.projektleitung → mitarbeitende ; projekt.fortsetzung_von → projekt
 - **QRR-Präfix-Aufbau** (`76 10400 …`) aus einem Beleg abgeleitet → gegen SZKB-ISR-Vertrag verifizieren.
 - Genaue interne **Faktura-Feldnamen** aus FileMaker noch nicht exportiert (nicht blockierend; Modell hier ist fachlich vollständig).
 - **Frontend-Detail** (reines Vanilla vs. leichtes Framework) in der Planungsphase final entscheiden.
-- Konkreter **CH-Hosting-Provider** (Exoscale vs. Infomaniak vs. self-hosted) noch zu wählen.
+- **Hosting entschieden:** Azure Postgres + Functions/App Service, Region Switzerland North; Auth via Entra ID. Zu verifizieren: Tenant-Geo = Schweiz für die PDF-Ablage in SharePoint/OneDrive.
+- SharePoint/Excel als Finanz-Speicher **verworfen** (siehe §3.1); mögliche Rolle nur als PDF-Archiv.
 - Gemischt-MWSt-Beispiel (mehrere Sätze auf einer Rechnung) zur Golden-Test-Absicherung wäre wünschenswert.
 
 ## 11. Zukunft (nach v1)
