@@ -13,22 +13,27 @@ export type ImportReport = {
   mwstSaetze: { angelegt: number; vorhanden: number };
   zaehler: { gesetztAuf: number | null; hinweis: string | null };
   summen: { budgetChf: SummenVergleich; offenProv: SummenVergleich; abgerechnet: SummenVergleich };
+  /** Handlungsbeduerftig: hier fehlt etwas oder muss jemand entscheiden. */
   warnungen: string[];
+  /** Reine Datenbefunde: festgehalten, aber es geht nichts verloren. */
+  datenbefunde: string[];
   /** Erlaeuterungen zum Lauf selbst (z.B. was der Dry-Run nicht pruefen kann). */
   hinweise: string[];
 };
 
-// Toleranz des Summenabgleichs, `anzahl` = Zahl der summierten Projekte.
-// Regel: jeder Betrag liegt als numeric(12,2) in der DB. Ein CSV-Wert mit mehr als
-// zwei Nachkommastellen wird beim Schreiben je Projekt um bis zu einen halben Rappen
-// gerundet, ueber n Projekte also um bis zu n * 0.005. Dazu kommt ein Rappen fuer die
-// Rundung der Gesamtsumme selbst. Eine feste Toleranz von 0.01 wuerde beim
-// angekuendigten Vollexport (~4967 Projekte) einen korrekten Lauf als ABWEICHUNG
-// melden; ohne den n-Anteil waere die Regel nicht skalierbar.
-export function vergleiche(csv: number, db: number | null, anzahl = 0): SummenVergleich {
+// Toleranz des Summenabgleichs. `gerundeteWerte` = Zahl der summierten Betraege, die
+// beim Schreiben als numeric(12,2) tatsaechlich gerundet werden mussten (mehr als zwei
+// Nachkommastellen). Nur solche Werte erzeugen ueberhaupt Spielraum, und zwar bis zu
+// einem halben Rappen je Wert; dazu kommt ein Rappen fuer die Rundung der Gesamtsumme.
+// Bewusst nicht an der Projektzahl aufgehaengt: der reale Export fuehrt durchweg zwei
+// Nachkommastellen, dort waere ein Term von n * 0.005 beim angekuendigten Vollexport
+// (~4967 Projekte) ein Spielraum von +/- 24.84 CHF — genug, um ein verlorenes
+// Kleinprojekt als "ok" durchzuwinken. So bleibt die Toleranz dort bei einem Rappen und
+// waechst nur, wenn ein Export wirklich feinere Betraege liefert.
+export function vergleiche(csv: number, db: number | null, gerundeteWerte = 0): SummenVergleich {
   if (db === null) return { csv, db: null, differenz: null, ok: true };
   const differenz = Math.round((db - csv) * 100) / 100;
-  const toleranz = 0.01 + anzahl * 0.005;
+  const toleranz = 0.01 + gerundeteWerte * 0.005;
   return { csv, db, differenz, ok: Math.abs(differenz) <= toleranz };
 }
 
@@ -74,9 +79,19 @@ export function formatReport(r: ImportReport): string {
       ? `Nicht gesetzt. ${r.zaehler.hinweis ?? ''}`.trim()
       : `Gesetzt auf **${r.zaehler.gesetztAuf}**.`,
     ``,
+    // Zuerst das, was jemanden braucht (unbekanntes Konto, uebersprungenes Projekt,
+    // unlesbarer Betrag, doppelte Projekt_Nr. ...), erst danach die reinen Befunde.
+    // Umgekehrt stand der Operator vor einer Wand von Kontaktnamen, bevor er die
+    // Kontonummern sah, die tatsaechlich zu klaeren sind.
     `## Warnungen (${r.warnungen.length})`,
     ``,
     ...(r.warnungen.length === 0 ? ['Keine.'] : r.warnungen.map((w) => `- ${w}`)),
+    ``,
+    `## Datenbefunde (${r.datenbefunde.length})`,
+    ``,
+    `Festgehalten, aber ohne Handlungsbedarf — es geht nichts verloren.`,
+    ``,
+    ...(r.datenbefunde.length === 0 ? ['Keine.'] : r.datenbefunde.map((d) => `- ${d}`)),
     ``,
     ...(r.hinweise.length === 0 ? [] : [`## Hinweise zum Lauf`, ``, ...r.hinweise.map((h) => `- ${h}`), ``]),
   ].join('\n');

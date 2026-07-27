@@ -77,13 +77,22 @@ export async function upsertProjektAusMigration(pool: pg.Pool, input: MigrationP
 }
 
 export type ProjektSchluessel = { stammnummer: number; jahr: number };
-export type ProjektSummen = { anzahl: number; budgetChf: number; offenProv: number; abgerechnet: number };
+/** Betraege sind null, wenn es nichts zu summieren gab — nicht 0. */
+export type ProjektSummen = { anzahl: number; budgetChf: number | null; offenProv: number | null; abgerechnet: number | null };
 
 // Summen ueber genau die uebergebenen Projekte. Der Migrations-Abgleich darf weder
 // Projekte mitzaehlen, die nicht aus diesem Export stammen (z.B. per REST erfasste),
 // noch Jahrgaenge auslassen, wenn eine Datei mehrere enthaelt.
 export async function projektSummenFuerSchluessel(pool: pg.Pool, schluessel: ProjektSchluessel[]): Promise<ProjektSummen> {
-  if (schluessel.length === 0) return { anzahl: 0, budgetChf: 0, offenProv: 0, abgerechnet: 0 };
+  // Leere Schluesselliste heisst "nichts uebernommen". Mit 0/0/0 haette der Abgleich
+  // einen erfolgreichen Vergleich von nichts behauptet ("0.00 | 0.00 | 0.00 | ok");
+  // null wird im Report als "—" gerendert und sagt die Wahrheit.
+  if (schluessel.length === 0) return { anzahl: 0, budgetChf: null, offenProv: null, abgerechnet: null };
+  // Ohne Dubletten: zwei Export-Zeilen mit derselben Projekt_Nr. liefern denselben
+  // Schluessel zweimal, das join unnest(...) traefe dieselbe Zeile zweimal und
+  // verdoppelte Summe *und* anzahl. Die CSV-Seite zaehlt beide Zeilen — die Differenz
+  // ist genau die Abweichung, die der Abgleich zeigen soll.
+  const eindeutig = [...new Map(schluessel.map((s) => [`${s.stammnummer}.${s.jahr}`, s])).values()];
   const r = await pool.query(
     `select count(*)::int as anzahl,
             coalesce(sum(p.budget_chf),0)::numeric      as budget_chf,
@@ -92,7 +101,7 @@ export async function projektSummenFuerSchluessel(pool: pg.Pool, schluessel: Pro
      from projekt p
      join unnest($1::int[], $2::int[]) as k(stammnummer, jahr)
        on p.stammnummer = k.stammnummer and p.jahr = k.jahr`,
-    [schluessel.map((s) => s.stammnummer), schluessel.map((s) => s.jahr)]);
+    [eindeutig.map((s) => s.stammnummer), eindeutig.map((s) => s.jahr)]);
   const row = r.rows[0];
   return { anzahl: row.anzahl, budgetChf: Number(row.budget_chf), offenProv: Number(row.offen_prov), abgerechnet: Number(row.abgerechnet) };
 }

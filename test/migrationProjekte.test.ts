@@ -69,6 +69,22 @@ describe('importProjekte', () => {
     expect(s.abgerechnet).toBeCloseTo(r.csvSummen.abgerechnet, 2);
   });
 
+  // Die Toleranz des Summenabgleichs haengt an der Zahl der Betraege, die beim
+  // Schreiben als numeric(12,2) ueberhaupt etwas verlieren — nicht an der Zahl der
+  // Projekte. Der reale Export hat nur zweistellige Nachkommas, dort ist der Wert 0.
+  it('zaehlt, wie viele Betraege beim Schreiben gerundet werden', async () => {
+    const ohne = await importProjekte(getPool(), gruppen(), idNachNummer);
+    expect(ohne.csvGerundet).toEqual({ budgetChf: 0, offenProv: 0, abgerechnet: 0 });
+
+    const g = gruppen();
+    g.push({ projekt: {
+      'Projekt_Nr.': '9996.26', 'Projekt_Name': 'Drei Nachkommastellen', 'Auftraggeber_Nr.': '1285',
+      'Budget CHF': '100.005', 'offen_prov.': '50.00', 'abgerechnet': '0.001',
+    }, kinder: [] });
+    const mit = await importProjekte(getPool(), g, idNachNummer);
+    expect(mit.csvGerundet).toEqual({ budgetChf: 1, offenProv: 0, abgerechnet: 1 });
+  });
+
   it('ueberspringt Projekte ohne bekannten Auftraggeber', async () => {
     const g = gruppen();
     g.push({ projekt: { 'Projekt_Nr.': '9997.26', 'Projekt_Name': 'Waise', 'Auftraggeber_Nr.': '77777' }, kinder: [] });

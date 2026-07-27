@@ -21,14 +21,25 @@ describe('vergleiche', () => {
     expect(vergleiche(100.0, null)).toEqual({ csv: 100.0, db: null, differenz: null, ok: true });
   });
 
-  // Jeder Betrag wird als numeric(12,2) gespeichert: je Projekt bis zu ein halber
-  // Rappen Rundung. Ueber ~4967 Projekte ist eine feste Toleranz von 0.01 zu eng
-  // und wuerde einen korrekten Lauf als ABWEICHUNG melden.
-  it('skaliert die Toleranz mit der Zahl der summierten Projekte', () => {
+  // Der Rundungsspielraum entsteht nur an Betraegen, die ueberhaupt mehr als zwei
+  // Nachkommastellen haben — nur die verlieren beim Schreiben als numeric(12,2)
+  // etwas. Die Toleranz skaliert darum mit deren Zahl, nicht mit der Zahl der
+  // Projekte.
+  it('skaliert die Toleranz mit der Zahl der tatsaechlich gerundeten Betraege', () => {
     expect(vergleiche(100.0, 100.5, 4967).ok).toBe(true);    // 0.50 << 0.01 + 4967*0.005
-    expect(vergleiche(100.0, 100.5, 3).ok).toBe(false);      // bei 3 Projekten nicht
+    expect(vergleiche(100.0, 100.5, 3).ok).toBe(false);      // bei 3 gerundeten Werten nicht
     expect(vergleiche(100.0, 100.02, 3).ok).toBe(true);      // 0.02 <= 0.01 + 3*0.005
     expect(vergleiche(100.0, 130.0, 4967).ok).toBe(false);   // grobe Abweichung faellt weiter auf
+  });
+
+  // Der reale Export enthaelt ausschliesslich Betraege mit hoechstens zwei
+  // Nachkommastellen. Ein am Projektzaehler haengender Spielraum waere dort
+  // +/- 24.84 CHF (4967 Projekte) — weit genug, um ein verlorenes Kleinprojekt
+  // als "ok" durchzuwinken. Ohne gerundete Werte bleibt es bei einem Rappen.
+  it('bleibt bei einem Rappen, wenn kein Betrag gerundet werden musste', () => {
+    expect(vergleiche(100.0, 100.01, 0).ok).toBe(true);
+    expect(vergleiche(100.0, 100.5, 0).ok).toBe(false);
+    expect(vergleiche(4435265.0, 4435240.0, 0).ok).toBe(false); // 25 CHF fallen jetzt auf
   });
 });
 

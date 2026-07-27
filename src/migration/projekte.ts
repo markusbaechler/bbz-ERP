@@ -5,13 +5,43 @@ import { fmText, fmZahl, fmProjektNummer, istProjektNummer, fmBereich } from './
 import { findKontoByNummer } from '../repos/kontoRepo';
 import { upsertProjektAusMigration, type ProjektSchluessel } from '../repos/projektRepo';
 
+export type Betragssummen = { budgetChf: number; offenProv: number; abgerechnet: number };
+
 export type ProjektImportErgebnis = {
   gelesen: number; neu: number; aktualisiert: number; uebersprungen: number;
-  csvSummen: { budgetChf: number; offenProv: number; abgerechnet: number };
+  csvSummen: Betragssummen;
+  /**
+   * Je Kennzahl die Zahl der CSV-Betraege, die beim Schreiben als numeric(12,2)
+   * gerundet werden mussten (mehr als zwei Nachkommastellen). Nur sie erzeugen
+   * ueberhaupt Rundungsspielraum — der Summenabgleich leitet daraus seine Toleranz ab.
+   */
+  csvGerundet: Betragssummen;
   /** (stammnummer, jahr) genau der Projekte, die dieser Lauf geschrieben hat. */
   schluessel: ProjektSchluessel[];
   warnungen: string[];
 };
+
+/** true, wenn der Wert als numeric(12,2) nicht verlustfrei gespeichert werden kann. */
+export const wirdGerundet = (n: number | null): boolean => n !== null && Math.round(n * 100) / 100 !== n;
+
+// Zwei Zeilen mit derselben Projekt_Nr. eroeffnen zwei Gruppen, landen wegen des
+// Upserts auf (stammnummer, jahr) aber in einem einzigen Datensatz: die letzte
+// gewinnt, die uebrigen sind still weg. Das ist ein Datenfehler im Export, den der
+// Operator sehen muss — und zugleich der Grund, warum die Schluesselliste des
+// Abgleichs dedupliziert wird (projektSummenFuerSchluessel).
+export function doppelteProjektNummern(gruppen: ProjektGruppe[]): string[] {
+  const zaehler = new Map<string, number>();
+  for (const g of gruppen) {
+    const nr = fmText(g.projekt['Projekt_Nr.']);
+    if (nr === null) continue;
+    zaehler.set(nr, (zaehler.get(nr) ?? 0) + 1);
+  }
+  return [...zaehler]
+    .filter(([, n]) => n > 1)
+    .map(([nr, n]) =>
+      `Projekt ${nr}: ${n} Zeilen mit derselben Projekt_Nr. im Export — nur die zuletzt gelesene ` +
+      `wird gespeichert, die Betraege der uebrigen fehlen in der Datenbank`);
+}
 
 // Die drei Beträge des Summenabgleichs plus die beiden weiteren Zahlfelder.
 export type ProjektZahlen = {
@@ -113,7 +143,9 @@ export async function importProjekte(
 ): Promise<ProjektImportErgebnis> {
   const e: ProjektImportErgebnis = {
     gelesen: gruppen.length, neu: 0, aktualisiert: 0, uebersprungen: 0,
-    csvSummen: { budgetChf: 0, offenProv: 0, abgerechnet: 0 }, schluessel: [], warnungen: [],
+    csvSummen: { budgetChf: 0, offenProv: 0, abgerechnet: 0 },
+    csvGerundet: { budgetChf: 0, offenProv: 0, abgerechnet: 0 },
+    schluessel: [], warnungen: doppelteProjektNummern(gruppen),
   };
   const auftraggeberNummern = new Set(idNachNummer.keys());
   // Kontonummer -> id (oder null fuer "nicht im Kontenplan"), einmal je Lauf aufgeloest
@@ -168,6 +200,9 @@ export async function importProjekte(
     e.csvSummen.budgetChf += budgetChf ?? 0;
     e.csvSummen.offenProv += offenProv ?? 0;
     e.csvSummen.abgerechnet += abgerechnet ?? 0;
+    if (wirdGerundet(budgetChf)) e.csvGerundet.budgetChf++;
+    if (wirdGerundet(offenProv)) e.csvGerundet.offenProv++;
+    if (wirdGerundet(abgerechnet)) e.csvGerundet.abgerechnet++;
   }
 
   e.csvSummen.budgetChf = Math.round(e.csvSummen.budgetChf * 100) / 100;

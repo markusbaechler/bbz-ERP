@@ -5,7 +5,10 @@ import { csvRecords } from './csv';
 import { gruppiereProjekte } from './gruppen';
 import { importStammdaten, KONTENPLAN } from './stammdaten';
 import { importAuftraggeber, sammleAuftraggeber } from './auftraggeber';
-import { importProjekte, projektUebersprungenGrund, pruefeProjekt, kontoWarnung } from './projekte';
+import {
+  importProjekte, projektUebersprungenGrund, pruefeProjekt, kontoWarnung,
+  doppelteProjektNummern,
+} from './projekte';
 import { vergleiche, formatReport, type ImportReport } from './report';
 import { fmText } from './normalize';
 import { projektSummenFuerSchluessel, type ProjektSchluessel } from '../repos/projektRepo';
@@ -37,14 +40,16 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
     // denselben Ueberspring-Regeln (projektUebersprungenGrund) und denselben Pruefungen
     // (pruefeProjekt) wie der Apply-Import, damit Dry-Run und Apply weder in den Zahlen
     // noch im Warnungssatz auseinanderlaufen.
-    const { gesehen: auftraggeberGesehen, warnungen: auftraggeberWarnungen } = sammleAuftraggeber(gruppen);
+    const {
+      gesehen: auftraggeberGesehen, warnungen: auftraggeberWarnungen, datenbefunde: auftraggeberBefunde,
+    } = sammleAuftraggeber(gruppen);
     const auftraggeberNummern = new Set(auftraggeberGesehen.keys());
     const bekannteKonten = new Set<string>(KONTENPLAN.map((k) => k.nummer));
 
     let uebersprungen = 0;
     let budgetChf = 0, offenProv = 0, abgerechnet = 0;
     const schluessel: ProjektSchluessel[] = [];
-    const projektWarnungen: string[] = [];
+    const projektWarnungen: string[] = doppelteProjektNummern(gruppen);
     for (const g of gruppen) {
       const projektNr = fmText(g.projekt['Projekt_Nr.']) ?? '(ohne Nr.)';
       const grund = projektUebersprungenGrund(g, auftraggeberNummern);
@@ -82,6 +87,7 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
         abgerechnet: vergleiche(abgerechnet, null),
       },
       warnungen: [...auftraggeberWarnungen, ...projektWarnungen],
+      datenbefunde: auftraggeberBefunde,
       hinweise: [DRY_RUN_KONTEN_HINWEIS],
     };
   }
@@ -108,12 +114,15 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
     projekte: { gelesen: pr.gelesen, neu: pr.neu, aktualisiert: pr.aktualisiert, uebersprungen: pr.uebersprungen },
     konten: stamm.konten, mwstSaetze: stamm.mwstSaetze,
     zaehler: { gesetztAuf, hinweis },
+    // Toleranz je Kennzahl aus der Zahl der tatsaechlich gerundeten Betraege — nicht
+    // aus der Projektzahl (siehe vergleiche in report.ts).
     summen: {
-      budgetChf: vergleiche(pr.csvSummen.budgetChf, db.budgetChf, db.anzahl),
-      offenProv: vergleiche(pr.csvSummen.offenProv, db.offenProv, db.anzahl),
-      abgerechnet: vergleiche(pr.csvSummen.abgerechnet, db.abgerechnet, db.anzahl),
+      budgetChf: vergleiche(pr.csvSummen.budgetChf, db.budgetChf, pr.csvGerundet.budgetChf),
+      offenProv: vergleiche(pr.csvSummen.offenProv, db.offenProv, pr.csvGerundet.offenProv),
+      abgerechnet: vergleiche(pr.csvSummen.abgerechnet, db.abgerechnet, pr.csvGerundet.abgerechnet),
     },
     warnungen: [...ag.warnungen, ...pr.warnungen],
+    datenbefunde: ag.datenbefunde,
     hinweise: [],
   };
 }

@@ -41,20 +41,38 @@ describe('Warnungen im Import', () => {
     expect(r.warnungen).toContainEqual(expect.stringContaining('Spalte Jahr=2026 weicht von der Nummer ab — 2025 verwendet'));
   });
 
-  it('meldet mehrere Ansprechpersonen zur selben Auftraggeber-Nummer', async () => {
+  // Mehrere Ansprechpersonen sind ein Datenbefund, kein Handlungsbedarf: die
+  // projektbezogene Ansprechperson bleibt am Projekt, es geht nichts verloren.
+  // Darum steht der Eintrag unter Datenbefunde und nicht ueber den Kontierungs-
+  // Warnungen, die tatsaechlich jemanden brauchen.
+  it('meldet mehrere Ansprechpersonen zur selben Auftraggeber-Nummer als Datenbefund', async () => {
     const r = await fuehreMigrationAus(getPool(), { projekteCsv: warnFixture, modus: 'apply' });
-    const w = r.warnungen.find((x) => x.includes('Ansprechperson'));
+    const w = r.datenbefunde.find((x) => x.includes('Ansprechperson'));
     expect(w).toBeDefined();
     expect(w).toContain('701');
     expect(w).toContain('Anna Muster');
     expect(w).toContain('Beat Beispiel');
+    expect(r.warnungen.join(' ')).not.toContain('Ansprechperson');
   });
 
-  it('erzeugt im Dry-Run denselben Warnungssatz wie der Apply-Lauf', async () => {
+  it('stellt handlungsbeduerftige Warnungen vor die Datenbefunde', async () => {
+    const r = await fuehreMigrationAus(getPool(), { projekteCsv: warnFixture, modus: 'apply' });
+    const md = formatReport(r);
+    expect(md).toContain(`## Warnungen (${r.warnungen.length})`);
+    expect(md).toContain(`## Datenbefunde (${r.datenbefunde.length})`);
+    expect(md.indexOf('## Warnungen')).toBeLessThan(md.indexOf('## Datenbefunde'));
+    // Die Kontierungs-Warnung steht vor dem ersten Datenbefund.
+    expect(md.indexOf('nicht im Kontenplan')).toBeLessThan(md.indexOf('## Datenbefunde'));
+    expect(r.warnungen.every((w) => !r.datenbefunde.includes(w))).toBe(true);
+  });
+
+  it('erzeugt im Dry-Run denselben Warnungs- und Befundsatz wie der Apply-Lauf', async () => {
     const dry = await fuehreMigrationAus(getPool(), { projekteCsv: warnFixture, modus: 'dry-run' });
     const apply = await fuehreMigrationAus(getPool(), { projekteCsv: warnFixture, modus: 'apply' });
     expect(sortiert(dry.warnungen)).toEqual(sortiert(apply.warnungen));
-    expect(dry.warnungen.length).toBeGreaterThanOrEqual(8);
+    expect(sortiert(dry.datenbefunde)).toEqual(sortiert(apply.datenbefunde));
+    expect(dry.warnungen.length).toBeGreaterThanOrEqual(7);
+    expect(dry.datenbefunde.length).toBeGreaterThanOrEqual(1);
   });
 
   it('sagt im Dry-Run, wogegen die Kontenpruefung laeuft', async () => {
