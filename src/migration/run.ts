@@ -12,12 +12,14 @@ import {
 import { vergleiche, formatReport, type ImportReport } from './report';
 import { fmText } from './normalize';
 import { projektSummenFuerSchluessel, type ProjektSchluessel } from '../repos/projektRepo';
-import { setzeRechnungZaehler } from '../repos/zaehlerRepo';
+import { getZaehler, setzeRechnungZaehler } from '../repos/zaehlerRepo';
+import { rechnungNrUntergrenze, zaehlerGesperrt } from '../config/rechnungszaehler';
 
 const ZAEHLER_HINWEIS =
   'Kein --rechnung-max uebergeben. Der Faktura-Export ist veraltet (hoechste Nr. 31491 vom 26.06.2025), ' +
   'der Livebeleg vom Juli 2026 traegt bereits Nr. 33214. Den aktuellen Hoechststand in FileMaker ablesen ' +
-  'und explizit uebergeben, sonst werden Rechnungsnummern doppelt vergeben.';
+  'und explizit uebergeben, sonst werden Rechnungsnummern doppelt vergeben. ' +
+  'Dafuer braucht es keinen Import mehr: "npm run zaehler -- --rechnung-max=<n>" setzt den Zaehler allein.';
 
 const DRY_RUN_KONTEN_HINWEIS =
   'Der Dry-Run prueft Konto/Aufw. Konto gegen den fest hinterlegten KONTENPLAN ' +
@@ -80,7 +82,11 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
       projekte: { gelesen: gruppen.length, neu: 0, aktualisiert: 0, uebersprungen },
       konten: { angelegt: 0, vorhanden: 0 },
       mwstSaetze: { angelegt: 0, vorhanden: 0 },
-      zaehler: { gesetztAuf: null, hinweis: opts.rechnungMax === undefined ? ZAEHLER_HINWEIS : 'Dry-Run: Zaehler nicht veraendert.' },
+      // stand/gesperrt bleiben null: der Dry-Run liest die Datenbank nicht.
+      zaehler: {
+        gesetztAuf: null, stand: null, untergrenze: rechnungNrUntergrenze(), gesperrt: null,
+        hinweis: opts.rechnungMax === undefined ? ZAEHLER_HINWEIS : 'Dry-Run: Zaehler nicht veraendert.',
+      },
       summen: {
         budgetChf: vergleiche(budgetChf, null),
         offenProv: vergleiche(offenProv, null),
@@ -107,13 +113,16 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
     gesetztAuf = await setzeRechnungZaehler(pool, opts.rechnungMax, 'CLI migrate:fm --rechnung-max');
     hinweis = null;
   }
+  // Stand nach dem Lauf — auch wenn dieser Lauf nichts gesetzt hat: der Operator
+  // liest hier ab, ob die Festschreibung offen ist oder die Untergrenze noch blockt.
+  const stand = await getZaehler(pool, 'rechnung_lfd_nr');
 
   return {
     quelle: opts.projekteCsv, modus: 'apply', jahr: jahre.length === 1 ? jahre[0] : null, jahre,
     auftraggeber: { gelesen: ag.gelesen, neu: ag.neu, aktualisiert: ag.aktualisiert, ohneAdresse: ag.ohneAdresse },
     projekte: { gelesen: pr.gelesen, neu: pr.neu, aktualisiert: pr.aktualisiert, uebersprungen: pr.uebersprungen },
     konten: stamm.konten, mwstSaetze: stamm.mwstSaetze,
-    zaehler: { gesetztAuf, hinweis },
+    zaehler: { gesetztAuf, stand, untergrenze: rechnungNrUntergrenze(), gesperrt: zaehlerGesperrt(stand), hinweis },
     // Toleranz je Kennzahl aus der Zahl der tatsaechlich gerundeten Betraege — nicht
     // aus der Projektzahl (siehe vergleiche in report.ts).
     summen: {

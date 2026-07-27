@@ -22,6 +22,8 @@ npm install
 npm test                      # vitest, alle Suites (DB nötig)
 npx tsc --noEmit              # Typecheck
 npm run dev                   # Server (Fastify) auf :3000
+npm run zaehler               # Rechnungszähler: Stand + Untergrenze abfragen
+npm run zaehler -- --rechnung-max=33214   # Zähler setzen (nur aufwärts, ohne Import)
 ```
 Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git config core.autocrlf false` ist gesetzt.
 
@@ -32,7 +34,7 @@ Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git
 - Beträge `numeric(12,2)`; DATE als String (TZ-sicher, `pool.ts` type-parser).
 - Deutsch, „ss" statt „ß". Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-## Fortschritt (Plan 1–4 in `master` gemergt; Plan 5 fertig auf `plan5-migration-filemaker`, noch nicht gepusht/gemergt)
+## Fortschritt (Plan 1–4 in `master` gemergt; Plan 5 als PR #5 offen; Plan 5b auf `plan5b-rechnungszaehler`, ab Plan-5-HEAD)
 - **Plan 1 Fundament & Projekte** ✅ — Migrations, Konto, MWSt-Satz, Auftraggeber (Pflichtadresse), Projekt (Stammnummer.Jahr, Jahresverlauf, Kontierung), Fastify+Rollen, REST.
 - **Plan 2 Verrechnung & MWSt** ✅ — MWSt-Engine (Rappenrundung 0.05, mehrsatzig, exkl/inkl), rechnung/rechnungsposition/zaehler, Festschreibung mit **lückenloser** Nummer (Zähler+Transaktion), Status/Storno, REST.
 - **Plan 3 QR-Rechnung & PDF** ✅ — QRR-Referenz (Golden reproduziert echten Beleg), swissqrbill-Daten, PDF (Brief+Zahlteil), `GET /rechnung/:id/pdf`. Beispiel-PDF in `..\fm-discovery\screens\beispiel_qr_rechnung.pdf`.
@@ -41,9 +43,15 @@ Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git
   - Die Festschreibung weist einen Auftraggeber mit `adresse_unvollstaendig = true` ab, bevor der Zähler läuft — sonst würde eine unwiderrufliche Rechnungsnummer (Spec §6.1) für einen nicht zustellbaren QR-Beleg verbraucht. Der Ausweg ist **`PUT /auftraggeber/:id`** (Admin) bzw. `updateAuftraggeber` in `src/repos/auftraggeberRepo.ts`: das Kennzeichen ist kein Eingabefeld, sondern fällt genau dann auf `false`, wenn Strasse, PLZ und Ort nach dem Update alle gefüllt sind.
   - Der Report trennt **`## Warnungen`** (Handlungsbedarf: unbekanntes Konto, übersprungenes Projekt, unlesbarer Betrag, doppelte `Projekt_Nr.`, unerkanntes MWSt, Jahr-Abweichung) von **`## Datenbefunde`** (abweichende Ansprechpersonen/Auftraggeber-Namen — es geht nichts verloren). Echter Export: 9 Warnungen + 14 Datenbefunde.
   - Toleranz des Summenabgleichs = `0.01 + (Zahl der tatsächlich gerundeten Beträge) * 0.005`, **nicht** an der Projektzahl aufgehängt (siehe `vergleiche` in `src/migration/report.ts`).
+- **Plan 5b Rechnungszähler** ✅ (Branch `plan5b-rechnungszaehler`, ab `plan5-migration-filemaker`) — der Zähler ist jetzt **eigenständig setzbar** und die Festschreibung ist **gesperrt**, solange er nicht gesetzt ist. **145 Tests grün.**
+  - **Untergrenze** `src/config/rechnungszaehler.ts`: Vorgabe **31491**, überschreibbar per `RECHNUNG_NR_UNTERGRENZE`. `festschreiben` weist jede Rechnung ab, solange `zaehler.rechnung_lfd_nr <= Untergrenze` — in derselben Transaktion, **bevor** eine Nummer verbraucht ist (gleiche Platzierung wie die Adress-Prüfung). Eine Untergrenze statt `> 0`, weil sie auch den *versehentlich zu tief* gesetzten Zähler abfängt.
+  - **CLI** `npm run zaehler [-- --rechnung-max=<n>]` (`src/cli/zaehler.ts`): ohne Argument reine Statusabfrage, mit Argument setzen — ohne CSV, ohne Import. Nur aufwärts; Argumentprüfung durch dieselbe `parseRechnungMax` wie die Migrations-CLI.
+  - **Routen** `PUT /zaehler/rechnung` (Admin, `{ wert }`) und `GET /zaehler/rechnung` (ohne Rollenprüfung, wie die übrigen GET-Routen) → Stand, Untergrenze, `gesperrt`, Nachweis.
+  - **Nachweis** (Migration `008_zaehler_audit.sql`): `zaehler.gesetzt_am` / `gesetzt_durch`. Akteur = `CLI npm run zaehler` bzw. `REST x-user-role=<rolle>` — mehr Identität gibt es bis Plan 6 nicht.
+  - Der Migrations-Report zeigt im `## Rechnungszaehler` zusätzlich den aktuellen Stand und ob die Untergrenze noch blockt (im Dry-Run nicht, der liest die DB nicht).
 
 ## Nächste Schritte (für neue Session)
-1. **Plan 5 abschliessen:** Branch `plan5-migration-filemaker` pushen und PR gegen `master` erstellen (Branch existiert auf GitHub noch nicht). Danach Plan 6.
+1. **Plan 5 abschliessen:** PR #5 (`plan5-migration-filemaker`) reviewen und mergen; danach `plan5b-rechnungszaehler` (setzt darauf auf) als eigenen PR nachziehen.
 2. **Plan 6 Frontend-PWA** + Entra-ID-Auth (echte Token statt Header-Platzhalter `x-user-role`) — Plan noch zu schreiben.
 3. Danach: Swico/S1-String, PDF-Feinlayout, camt-Import (v2).
 
@@ -51,7 +59,7 @@ Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git
 - **Aus FileMaker nachzuziehen (Befunde Plan 5, blockieren die Migration):**
   - **Adressen-Export der Auftraggeber** — fehlt in beiden Exporten; der Adressblock der Faktura hängt an `Bank_Nr.`, einem *anderen* Nummernkreis als `Auftraggeber_Nr.` (nur 13/49 Überschneidung, widersprüchliche Namen). Darf **nicht** gejoint werden → Import setzt `adresse_unvollstaendig = true`. Ohne Adressen keine QR-Rechnung. **Der Weg zum Nachtragen existiert** (`PUT /auftraggeber/:id`, s.o.); offen sind nur noch die Adressdaten selbst — alle 49 migrierten Auftraggeber sind bis dahin nicht fakturierbar. Ein Massenweg (CSV-Import der Adressen) fehlt noch; für 49 Datensätze reicht die Einzelpflege.
   - **Vollständiger Projekt-Export** — `export_daten.csv` enthält nur Jahr 2026 (151 von ~4967 Projekten). Vollexport aller Jahrgänge nachziehen; der Import ist idempotent und kann erneut laufen.
-  - **Aktueller Faktura-Export** — vorhandener endet 26.06.2025 bei Rg-Nr 31491, Livebeleg Juli 2026 trägt 33214. Zählerstand darum nur manuell via `--rechnung-max`; Rechnungs-/OP-Übernahme erst in einem Folgeplan „5b".
+  - **Aktueller Faktura-Export / Zählerstand** — vorhandener Export endet 26.06.2025 bei Rg-Nr **31491**, ein Livebeleg vom Juli 2026 trägt **33214**. Der Zähler wird **nie** aus einem Export abgeleitet: der reale Höchststand ist **in FileMaker abzulesen** und explizit zu setzen — `npm run zaehler -- --rechnung-max=<n>` (kein Import nötig) oder `PUT /zaehler/rechnung`. Bis dahin **blockt die Festschreibung**: die Untergrenze **31491** ist ein *Boden* (der höchste aus dem Export belegbare Stand), nicht die Antwort — der wirkliche Höchststand liegt darüber. `GET /zaehler/rechnung` bzw. `npm run zaehler` zeigen jederzeit, ob noch gesperrt ist und wer wann gesetzt hat. Rechnungs-/OP-Übernahme aus FileMaker weiterhin offen (Folgeplan).
   - **Kontenplan-Bezeichnungen** in `src/migration/stammdaten.ts` sind abgeleitet, nicht bestätigt. Die vier fünfstelligen Konten (`31001`, `31021`, `32001`, `32041`) sind ungeklärt — betroffene Projekte kommen ohne Kontierung an.
   - **Mapping `Referent intern` → `projektleitung_kuerzel` ist unbestätigt.** „Interner Referent" und „Projektleitung" können im Quellsystem verschiedene Rollen sein; dann steht in `projekt.projektleitung_kuerzel` die falsche Person. Vor dem produktiven Lauf mit dem Fachbereich klären (gleiche Sitzung wie die Kontenplan-Bezeichnungen).
 

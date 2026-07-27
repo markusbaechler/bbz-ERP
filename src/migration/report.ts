@@ -11,7 +11,17 @@ export type ImportReport = {
   projekte: { gelesen: number; neu: number; aktualisiert: number; uebersprungen: number };
   konten: { angelegt: number; vorhanden: number };
   mwstSaetze: { angelegt: number; vorhanden: number };
-  zaehler: { gesetztAuf: number | null; hinweis: string | null };
+  zaehler: {
+    /** Wert, den *dieser* Lauf gesetzt hat — null, wenn er den Zaehler nicht angefasst hat. */
+    gesetztAuf: number | null;
+    /** Stand nach dem Lauf. Im Dry-Run null: der liest die Datenbank nicht. */
+    stand: number | null;
+    /** Untergrenze aus src/config/rechnungszaehler.ts. */
+    untergrenze: number;
+    /** Blockt die Untergrenze die Festschreibung? Im Dry-Run null (Stand unbekannt). */
+    gesperrt: boolean | null;
+    hinweis: string | null;
+  };
   summen: { budgetChf: SummenVergleich; offenProv: SummenVergleich; abgerechnet: SummenVergleich };
   /** Handlungsbeduerftig: hier fehlt etwas oder muss jemand entscheiden. */
   warnungen: string[];
@@ -48,6 +58,23 @@ const jahrgangText = (jahre: number[]): string => {
   return ` · **Jahrgaenge:** ${jahre[0]}–${jahre[jahre.length - 1]} (${jahre.length})`;
 };
 
+// Was der Lauf gesetzt hat, ist nur die halbe Auskunft — der Operator will wissen,
+// ob er jetzt fakturieren kann. Darum zusaetzlich Stand, Untergrenze und Sperre.
+const zaehlerStandZeile = (z: ImportReport['zaehler']): string => {
+  if (z.stand === null) {
+    return `Aktueller Stand: im Dry-Run nicht gelesen (der Dry-Run fasst die Datenbank nicht an). ` +
+      `Untergrenze: **${z.untergrenze}**.`;
+  }
+  if (z.gesperrt) {
+    return `Aktueller Stand: **${z.stand}**, Untergrenze **${z.untergrenze}** — die Festschreibung ist ` +
+      `**gesperrt**: der Zaehler steht noch nicht auf dem FileMaker-Stand. Hoechststand in FileMaker ablesen ` +
+      `und setzen: \`npm run zaehler -- --rechnung-max=<n>\` oder \`PUT /zaehler/rechnung\`.`;
+  }
+  return `Aktueller Stand: **${z.stand}**, ueber der Untergrenze **${z.untergrenze}** — die Festschreibung ist ` +
+    `moeglich. Die Untergrenze ist nur der aus dem Faktura-Export belegbare Boden (26.06.2025); der reale ` +
+    `Hoechststand steht in FileMaker und liegt darueber.`;
+};
+
 export function formatReport(r: ImportReport): string {
   const zeile = (name: string, v: SummenVergleich) =>
     `| ${name} | ${chf(v.csv)} | ${chf(v.db)} | ${v.differenz === null ? '—' : chf(v.differenz)} | ${v.ok ? 'ok' : '**ABWEICHUNG**'} |`;
@@ -78,6 +105,8 @@ export function formatReport(r: ImportReport): string {
     r.zaehler.gesetztAuf === null
       ? `Nicht gesetzt. ${r.zaehler.hinweis ?? ''}`.trim()
       : `Gesetzt auf **${r.zaehler.gesetztAuf}**.`,
+    ``,
+    zaehlerStandZeile(r.zaehler),
     ``,
     // Zuerst das, was jemanden braucht (unbekanntes Konto, uebersprungenes Projekt,
     // unlesbarer Betrag, doppelte Projekt_Nr. ...), erst danach die reinen Befunde.

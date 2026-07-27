@@ -88,6 +88,27 @@ describe('fuehreMigrationAus', () => {
     expect(await getZaehler(getPool(), 'rechnung_lfd_nr')).toBe(33214);
   });
 
+  // Der Operator liest den Report, um zu wissen, wo er steht. "Zaehler gesetzt auf X"
+  // allein sagt ihm nicht, ob die Fakturierung jetzt offen ist.
+  it('zeigt im Apply-Report den aktuellen Stand und ob die Untergrenze noch blockt', async () => {
+    const r = await fuehreMigrationAus(getPool(), { projekteCsv: fixture, modus: 'apply' });
+    expect(r.zaehler.stand).toBe(33214); // aus dem vorherigen Lauf, ohne erneutes Setzen
+    expect(r.zaehler.untergrenze).toBe(31491);
+    expect(r.zaehler.gesperrt).toBe(false);
+    const md = formatReport(r);
+    expect(md).toContain('## Rechnungszaehler');
+    expect(md).toContain('33214');
+    expect(md).toContain('31491');
+  });
+
+  it('liest den Stand im Dry-Run nicht aus der Datenbank', async () => {
+    const r = await fuehreMigrationAus(getPool(), { projekteCsv: fixture, modus: 'dry-run' });
+    expect(r.zaehler.stand).toBeNull();
+    expect(r.zaehler.gesperrt).toBeNull();
+    expect(r.zaehler.untergrenze).toBe(31491);
+    expect(formatReport(r)).toContain('im Dry-Run nicht gelesen');
+  });
+
   it('formatiert einen lesbaren Markdown-Report', async () => {
     const r = await fuehreMigrationAus(getPool(), { projekteCsv: fixture, modus: 'dry-run' });
     const md = formatReport(r);
