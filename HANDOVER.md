@@ -32,15 +32,16 @@ Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git
 - Beträge `numeric(12,2)`; DATE als String (TZ-sicher, `pool.ts` type-parser).
 - Deutsch, „ss" statt „ß". Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-## Fortschritt
-- **Plan 1 Fundament & Projekte** ✅ gemergt — Migrations, Konto, MWSt-Satz, Auftraggeber (Pflichtadresse), Projekt (Stammnummer.Jahr, Jahresverlauf, Kontierung), Fastify+Rollen, REST.
-- **Plan 2 Verrechnung & MWSt** ✅ gemergt — MWSt-Engine (Rappenrundung 0.05, mehrsatzig, exkl/inkl), rechnung/rechnungsposition/zaehler, Festschreibung mit **lückenloser** Nummer (Zähler+Transaktion), Status/Storno, REST.
-- **Plan 3 QR-Rechnung & PDF** — **PR #3 offen** — QRR-Referenz (Golden reproduziert echten Beleg), swissqrbill-Daten, PDF (Brief+Zahlteil), `GET /rechnung/:id/pdf`. 33 Tests grün.
+## Fortschritt (alle in `master` gemergt)
+- **Plan 1 Fundament & Projekte** ✅ — Migrations, Konto, MWSt-Satz, Auftraggeber (Pflichtadresse), Projekt (Stammnummer.Jahr, Jahresverlauf, Kontierung), Fastify+Rollen, REST.
+- **Plan 2 Verrechnung & MWSt** ✅ — MWSt-Engine (Rappenrundung 0.05, mehrsatzig, exkl/inkl), rechnung/rechnungsposition/zaehler, Festschreibung mit **lückenloser** Nummer (Zähler+Transaktion), Status/Storno, REST.
+- **Plan 3 QR-Rechnung & PDF** ✅ — QRR-Referenz (Golden reproduziert echten Beleg), swissqrbill-Daten, PDF (Brief+Zahlteil), `GET /rechnung/:id/pdf`. Beispiel-PDF in `..\fm-discovery\screens\beispiel_qr_rechnung.pdf`.
+- **Plan 4 Debitorenkontrolle** ✅ — `zahlungseingang` (manuell), Zahlung+Statuswechsel transaktional, offene Posten, Kontokorrent-Saldo, REST. **39 Tests grün.**
 
-## Nächste Schritte
-1. **Plan 4 Debitorenkontrolle** (nächster Bau): `zahlungseingang`, offene Posten je Rechnung, Kontokorrent-Saldo je Auftraggeber, OP-Liste. Zahlung **manuell** (kein camt-Import in v1). Repo `debitorRepo`, REST-Routen, Saldo transaktional.
-2. **Plan 5 Migration** aus FileMaker-Export (auftraggeber/konto/mwst_satz/projekt), **Zähler-Startwert** = FileMaker-Max der Rechnungsnummer setzen, Summen-Validierung.
-3. **Plan 6 Frontend-PWA** + Entra-ID-Auth (echte Token statt Header-Platzhalter).
+## Nächste Schritte (für neue Session)
+1. **Plan 5 Migration** aus FileMaker-Export (auftraggeber/konto/mwst_satz/projekt), **Zähler-Startwert** (`zaehler.rechnung_lfd_nr`) = FileMaker-Max der Rechnungsnummer setzen, Summen-Validierung gegen FileMaker-Report. Rohdaten in `..\fm-discovery\export\`.
+2. **Plan 6 Frontend-PWA** + Entra-ID-Auth (echte Token statt Header-Platzhalter `x-user-role`).
+3. Danach: Swico/S1-String, PDF-Feinlayout, camt-Import (v2).
 
 ## Offene Punkte / To-verify
 - `qrrPrefix` (`7610400` in `src/config/creditor.ts`) final gegen **SZKB-ISR-Vertrag** bestätigen (Golden deckt aktuellen Stand).
