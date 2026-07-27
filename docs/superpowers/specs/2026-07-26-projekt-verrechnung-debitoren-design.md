@@ -65,8 +65,9 @@ Geprüfte Alternative (Nutzerfrage): v1 auf **MS Lists/Excel** hosten, später m
 - **Regel:** Debitor-Adresse **vollständig** (Pflicht Strasse/PLZ/Ort/Land) — behebt heutige QR-Lücke.
 
 ### 4.2 `projekt`
-- `id`, `nummer` (z. B. „6231.26" = `basisnummer`.`jahr`), `basisnummer` (int), `jahr` (int)
-- `alte_projekt_nr` (Migration), `fortsetzung_von_id` (FK auf Vorjahresprojekt), `kuerzel`
+- `id`, `nummer` (Anzeige, z. B. „6231.26" = `stammnummer`.`jahr2`), **`stammnummer`** (int, i. d. R. 4-stellig — identifiziert das Projekt **jahresübergreifend**), `jahr` (int, 4-stellig)
+- **Jahresverlauf:** alle `projekt`-Zeilen mit gleicher `stammnummer`, sortiert nach `jahr`, bilden die Fortführung desselben Projekts über die Jahre (z. B. 6231.24 → .25 → .26). `stammnummer` ist damit der Gruppierungsschlüssel; ein Projekt ist eindeutig über (`stammnummer`, `jahr`).
+- `alte_projekt_nr` (Migration), `fortsetzung_von_id` (FK, **optional** — nur für Sonderfälle wie Jahreslücken/Umnummerierung; Normalfall wird über `stammnummer` abgeleitet), `kuerzel`
 - `name`, `bereich` (enum: Banking, Lizenzierung, Kundenberaterausbildung/IGK, Leadership, Beratung, Managementausbildung, …)
 - `auftraggeber_id` (FK), `ansprechperson`
 - `budget_chf` (numeric), `budget_tage` (numeric), `ertragskonto_id` (FK `konto`, Default-Kontierung)
@@ -124,7 +125,7 @@ projekt.projektleitung → mitarbeitende ; projekt.fortsetzung_von → projekt
 ### 5.1 Projekte
 - CRUD Projekte, Filter nach Jahr/Bereich/Auftraggeber/Status.
 - **Kontierung:** Default-Ertragskonto am Projekt; jede Position erbt es, kann abweichen.
-- **Jahres-Fortführung:** „Fortsetzung von" verlinkt Vorjahresprojekt (Nummernschema `basisnummer.jahr`).
+- **Jahres-Fortführung:** über die **Stammnummer** (4 Ziffern vor dem Punkt). Der Jahresverlauf eines Projekts = alle Zeilen gleicher Stammnummer über die Jahre; „Fortsetzung von" nur als optionaler Sonderfall-Link.
 - Budget-Übersicht: Budget CHF, abgerechnet, offen — pro Projekt und aggregiert.
 
 ### 5.2 Verrechnung (Rechnungen)

@@ -375,7 +375,7 @@ export type Auftraggeber = {
   ansprechperson: string|null; email: string|null; telefon: string|null; aktiv: boolean;
 };
 export type Projekt = {
-  id: string; nummer: string; basisnummer: number; jahr: number;
+  id: string; nummer: string; stammnummer: number; jahr: number;
   kuerzel: string|null; name: string; bereich: string|null;
   auftraggeberId: string; ertragskontoId: string|null;
   budgetChf: number|null; budgetTage: number|null; mwstModus: 'exkl'|'inkl';
@@ -601,7 +601,9 @@ git add -A && git commit -m "feat(stammdaten): auftraggeberRepo mit Pflicht-Adre
 
 ---
 
-## Task 6: ProjektRepo mit Nummernschema & Kontierung
+## Task 6: ProjektRepo mit Stammnummer-Schema, Jahresverlauf & Kontierung
+
+> **Nummernschema (fachlich):** `nummer` = `stammnummer` (4 Ziffern) + `.` + 2-stelliges Jahr, z. B. `6231.26`. Die **Stammnummer identifiziert das Projekt jahresübergreifend**; alle Zeilen gleicher Stammnummer = **Jahresverlauf** (z. B. 6231.24 → .25 → .26). Eindeutig über (`stammnummer`, `jahr`).
 
 **Files:**
 - Create: `db/migrations/004_projekt.sql`, `src/repos/projektRepo.ts`, `test/projektRepo.test.ts`
@@ -609,9 +611,10 @@ git add -A && git commit -m "feat(stammdaten): auftraggeberRepo mit Pflicht-Adre
 **Interfaces:**
 - Consumes: `getPool`, `resetDb`, `Projekt`, `createAuftraggeber`, `createKonto`, `ValidationError`, `NotFoundError`
 - Produces:
-  - `createProjekt(pool, input: { basisnummer: number; jahr: number; name: string; auftraggeberId: string; ertragskontoId?: string|null; kuerzel?: string|null; bereich?: string|null; budgetChf?: number|null; budgetTage?: number|null; mwstModus?: 'exkl'|'inkl'; fortsetzungVonId?: string|null }): Promise<Projekt>` — `nummer` = `${basisnummer}.${String(jahr).slice(-2)}`; wirft `ValidationError` bei fehlendem `name/auftraggeberId`
+  - `createProjekt(pool, input: { stammnummer: number; jahr: number; name: string; auftraggeberId: string; ertragskontoId?: string|null; kuerzel?: string|null; bereich?: string|null; budgetChf?: number|null; budgetTage?: number|null; mwstModus?: 'exkl'|'inkl'; fortsetzungVonId?: string|null }): Promise<Projekt>` — `nummer` = `${stammnummer}.${String(jahr).slice(-2)}`; wirft `ValidationError` bei fehlendem `name/auftraggeberId`
   - `getProjektById(pool, id): Promise<Projekt>`
   - `listProjekte(pool, filter?: { jahr?: number; auftraggeberId?: string }): Promise<Projekt[]>`
+  - `getJahresverlauf(pool, stammnummer: number): Promise<Projekt[]>` — alle Projekte dieser Stammnummer, nach `jahr` aufsteigend sortiert
 
 - [ ] **Step 1: Failing test** — `test/projektRepo.test.ts`
 
@@ -621,7 +624,7 @@ import { getPool, closePool } from '../src/db/pool';
 import { resetDb } from './helpers/db';
 import { createAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { createKonto } from '../src/repos/kontoRepo';
-import { createProjekt, getProjektById, listProjekte } from '../src/repos/projektRepo';
+import { createProjekt, getProjektById, listProjekte, getJahresverlauf } from '../src/repos/projektRepo';
 
 let auftraggeberId: string; let kontoId: string;
 beforeAll(async () => {
@@ -632,21 +635,29 @@ beforeAll(async () => {
 afterAll(async () => { await closePool(); });
 
 describe('projektRepo', () => {
-  it('bildet nummer als basisnummer.jahr und speichert Kontierung', async () => {
+  it('bildet nummer als stammnummer.jahr2 und speichert Kontierung', async () => {
     const p = await createProjekt(getPool(), {
-      basisnummer: 6231, jahr: 2026, name: 'Ausgaben/Einnahmen bbz', auftraggeberId,
+      stammnummer: 6231, jahr: 2026, name: 'Ausgaben/Einnahmen bbz', auftraggeberId,
       ertragskontoId: kontoId, budgetChf: 24600, budgetTage: 2.5,
     });
     expect(p.nummer).toBe('6231.26');
+    expect(p.stammnummer).toBe(6231);
     expect(p.mwstModus).toBe('exkl');
     const again = await getProjektById(getPool(), p.id);
     expect(again.ertragskontoId).toBe(kontoId);
     expect(Number(again.budgetChf)).toBe(24600);
   });
   it('filtert nach Jahr', async () => {
-    await createProjekt(getPool(), { basisnummer: 7575, jahr: 2025, name: 'Altprojekt', auftraggeberId });
+    await createProjekt(getPool(), { stammnummer: 7575, jahr: 2025, name: 'Altprojekt', auftraggeberId });
     const y26 = await listProjekte(getPool(), { jahr: 2026 });
     expect(y26.every(p => p.jahr === 2026)).toBe(true);
+  });
+  it('liefert den Jahresverlauf einer Stammnummer nach Jahr sortiert', async () => {
+    await createProjekt(getPool(), { stammnummer: 6231, jahr: 2024, name: 'bbz 2024', auftraggeberId });
+    await createProjekt(getPool(), { stammnummer: 6231, jahr: 2025, name: 'bbz 2025', auftraggeberId });
+    const verlauf = await getJahresverlauf(getPool(), 6231);
+    expect(verlauf.map(p => p.jahr)).toEqual([2024, 2025, 2026]);
+    expect(verlauf.map(p => p.nummer)).toEqual(['6231.24', '6231.25', '6231.26']);
   });
 });
 ```
@@ -660,8 +671,8 @@ describe('projektRepo', () => {
 create table projekt (
   id uuid primary key default gen_random_uuid(),
   nummer text not null,
-  basisnummer integer not null,
-  jahr integer not null,
+  stammnummer integer not null,          -- 4-stellig; identifiziert das Projekt jahresuebergreifend
+  jahr integer not null,                 -- 4-stellig
   kuerzel text,
   name text not null,
   bereich text,
@@ -670,11 +681,12 @@ create table projekt (
   budget_chf numeric(12,2),
   budget_tage numeric(6,2),
   mwst_modus text not null default 'exkl' check (mwst_modus in ('exkl','inkl')),
-  fortsetzung_von_id uuid references projekt(id),
+  fortsetzung_von_id uuid references projekt(id),   -- optional, nur Sonderfaelle
   erstellt_am timestamptz not null default now(),
   geaendert_am timestamptz not null default now(),
-  unique (basisnummer, jahr)
+  unique (stammnummer, jahr)             -- ein Projekt pro Stammnummer+Jahr
 );
+create index projekt_stammnummer_idx on projekt(stammnummer);  -- Jahresverlauf
 create index projekt_jahr_idx on projekt(jahr);
 create index projekt_auftraggeber_idx on projekt(auftraggeber_id);
 ```
@@ -686,7 +698,7 @@ import type { Projekt } from '../domain/types';
 import { ValidationError, NotFoundError } from '../domain/errors';
 
 const map = (r: any): Projekt => ({
-  id: r.id, nummer: r.nummer, basisnummer: r.basisnummer, jahr: r.jahr,
+  id: r.id, nummer: r.nummer, stammnummer: r.stammnummer, jahr: r.jahr,
   kuerzel: r.kuerzel, name: r.name, bereich: r.bereich,
   auftraggeberId: r.auftraggeber_id, ertragskontoId: r.ertragskonto_id,
   budgetChf: r.budget_chf === null ? null : Number(r.budget_chf),
@@ -695,17 +707,17 @@ const map = (r: any): Projekt => ({
 });
 
 export async function createProjekt(pool: pg.Pool, input: {
-  basisnummer: number; jahr: number; name: string; auftraggeberId: string;
+  stammnummer: number; jahr: number; name: string; auftraggeberId: string;
   ertragskontoId?: string|null; kuerzel?: string|null; bereich?: string|null;
   budgetChf?: number|null; budgetTage?: number|null; mwstModus?: 'exkl'|'inkl'; fortsetzungVonId?: string|null;
 }): Promise<Projekt> {
   if (!input.name?.trim()) throw new ValidationError('name ist Pflicht');
   if (!input.auftraggeberId) throw new ValidationError('auftraggeberId ist Pflicht');
-  const nummer = `${input.basisnummer}.${String(input.jahr).slice(-2)}`;
+  const nummer = `${input.stammnummer}.${String(input.jahr).slice(-2)}`;
   const r = await pool.query(
-    `insert into projekt(nummer,basisnummer,jahr,name,auftraggeber_id,ertragskonto_id,kuerzel,bereich,budget_chf,budget_tage,mwst_modus,fortsetzung_von_id)
+    `insert into projekt(nummer,stammnummer,jahr,name,auftraggeber_id,ertragskonto_id,kuerzel,bereich,budget_chf,budget_tage,mwst_modus,fortsetzung_von_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,coalesce($11,'exkl'),$12) returning *`,
-    [nummer, input.basisnummer, input.jahr, input.name, input.auftraggeberId,
+    [nummer, input.stammnummer, input.jahr, input.name, input.auftraggeberId,
      input.ertragskontoId ?? null, input.kuerzel ?? null, input.bereich ?? null,
      input.budgetChf ?? null, input.budgetTage ?? null, input.mwstModus ?? null, input.fortsetzungVonId ?? null]);
   return map(r.rows[0]);
@@ -723,6 +735,10 @@ export async function listProjekte(pool: pg.Pool, filter: { jahr?: number; auftr
   const r = await pool.query(`select * from projekt ${where} order by nummer`, args);
   return r.rows.map(map);
 }
+export async function getJahresverlauf(pool: pg.Pool, stammnummer: number): Promise<Projekt[]> {
+  const r = await pool.query('select * from projekt where stammnummer=$1 order by jahr asc', [stammnummer]);
+  return r.rows.map(map);
+}
 ```
 
 - [ ] **Step 4: Verify pass** — Run: `npm test -- projektRepo` → PASS.
@@ -730,7 +746,7 @@ export async function listProjekte(pool: pg.Pool, filter: { jahr?: number; auftr
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A && git commit -m "feat(projekt): projektRepo mit Nummernschema und Kontierung"
+git add -A && git commit -m "feat(projekt): projektRepo mit Stammnummer/Jahresverlauf und Kontierung"
 ```
 
 ---
@@ -856,7 +872,7 @@ describe('routes', () => {
     const auftraggeberId = a.json().id;
 
     const p = await app.inject({ method: 'POST', url: '/projekt', headers: admin,
-      payload: { basisnummer: 6231, jahr: 2026, name: 'Testprojekt', auftraggeberId } });
+      payload: { stammnummer: 6231, jahr: 2026, name: 'Testprojekt', auftraggeberId } });
     expect(p.statusCode).toBe(201);
     expect(p.json().nummer).toBe('6231.26');
 
