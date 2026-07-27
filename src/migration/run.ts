@@ -9,8 +9,10 @@ import {
   importProjekte, projektUebersprungenGrund, pruefeProjekt, kontoWarnung,
   doppelteProjektNummern,
 } from './projekte';
+import { importAdressen } from './adressen';
 import { vergleiche, formatReport, type ImportReport } from './report';
 import { fmText } from './normalize';
+import { ValidationError } from '../domain/errors';
 import { projektSummenFuerSchluessel, type ProjektSchluessel } from '../repos/projektRepo';
 import { getZaehler, setzeRechnungZaehler } from '../repos/zaehlerRepo';
 import { rechnungNrUntergrenze, zaehlerGesperrt } from '../config/rechnungszaehler';
@@ -31,7 +33,66 @@ const DRY_RUN_KONTEN_HINWEIS =
 const jahrgaenge = (schluessel: ProjektSchluessel[]): number[] =>
   [...new Set(schluessel.map((s) => s.jahr))].sort((a, b) => a - b);
 
+const ADRESSEN_DRY_RUN_HINWEIS =
+  'Der Adressen-Dry-Run liest die Auftraggeber (nur lesend, ueber src/repos), weil die Zuordnung ' +
+  'Kunden Nr. -> Auftraggeber-Nr. erst an der Datenbank entsteht — ohne sie liesse sich weder ' +
+  '"zugeordnet" noch "weiterhin gesperrt" beantworten. Geschrieben wird nichts. Darin unterscheidet ' +
+  'er sich bewusst vom Projekt-Dry-Run, der die Datenbank gar nicht anfasst.';
+
 export async function fuehreMigrationAus(pool: pg.Pool, opts: {
+  projekteCsv?: string; adressenCsv?: string; modus: 'dry-run' | 'apply'; rechnungMax?: number;
+}): Promise<ImportReport> {
+  if (opts.projekteCsv === undefined && opts.adressenCsv === undefined) {
+    throw new ValidationError('Mindestens eines von projekteCsv / adressenCsv wird gebraucht');
+  }
+
+  // Reiner Adressen-Nachtrag: der Adressexport kommt nach dem Projekt-Import, deshalb
+  // muss er ohne Projektdatei laufen koennen.
+  if (opts.projekteCsv === undefined) {
+    const adressen = await importAdressen(pool, {
+      quelle: opts.adressenCsv!, text: readFileSync(opts.adressenCsv!, 'utf8'), modus: opts.modus,
+    });
+    const stand = opts.modus === 'apply' ? await getZaehler(pool, 'rechnung_lfd_nr') : null;
+    return {
+      quelle: opts.adressenCsv!, modus: opts.modus, projekteLauf: false, jahr: null, jahre: [],
+      auftraggeber: { gelesen: 0, neu: 0, aktualisiert: 0, ohneAdresse: adressen.nochOhneAdresse.length },
+      projekte: { gelesen: 0, neu: 0, aktualisiert: 0, uebersprungen: 0 },
+      konten: { angelegt: 0, vorhanden: 0 },
+      mwstSaetze: { angelegt: 0, vorhanden: 0 },
+      zaehler: {
+        gesetztAuf: null, stand, untergrenze: rechnungNrUntergrenze(),
+        gesperrt: stand === null ? null : zaehlerGesperrt(stand),
+        hinweis: 'Adressen-Nachtrag: der Zaehler wird hier nicht angefasst.',
+      },
+      summen: {
+        budgetChf: vergleiche(0, null), offenProv: vergleiche(0, null), abgerechnet: vergleiche(0, null),
+      },
+      adressen,
+      warnungen: adressen.warnungen,
+      datenbefunde: adressen.datenbefunde,
+      hinweise: opts.modus === 'dry-run' ? [ADRESSEN_DRY_RUN_HINWEIS] : [],
+    };
+  }
+
+  const report = await fuehreProjektMigrationAus(pool, { ...opts, projekteCsv: opts.projekteCsv });
+  if (opts.adressenCsv === undefined) return report;
+
+  // Beide Dateien in einem Lauf: erst die Projekte (sie legen die Auftraggeber an),
+  // dann die Adressen — sonst faende der Nachtrag niemanden.
+  const adressen = await importAdressen(pool, {
+    quelle: opts.adressenCsv, text: readFileSync(opts.adressenCsv, 'utf8'), modus: opts.modus,
+  });
+  return {
+    ...report,
+    adressen,
+    auftraggeber: { ...report.auftraggeber, ohneAdresse: adressen.nochOhneAdresse.length },
+    warnungen: [...report.warnungen, ...adressen.warnungen],
+    datenbefunde: [...report.datenbefunde, ...adressen.datenbefunde],
+    hinweise: opts.modus === 'dry-run' ? [...report.hinweise, ADRESSEN_DRY_RUN_HINWEIS] : report.hinweise,
+  };
+}
+
+async function fuehreProjektMigrationAus(pool: pg.Pool, opts: {
   projekteCsv: string; modus: 'dry-run' | 'apply'; rechnungMax?: number;
 }): Promise<ImportReport> {
   const { records } = csvRecords(readFileSync(opts.projekteCsv, 'utf8'));
@@ -77,7 +138,8 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
     const jahre = jahrgaenge(schluessel);
 
     return {
-      quelle: opts.projekteCsv, modus: 'dry-run', jahr: jahre.length === 1 ? jahre[0] : null, jahre,
+      quelle: opts.projekteCsv, modus: 'dry-run', projekteLauf: true, adressen: null,
+      jahr: jahre.length === 1 ? jahre[0] : null, jahre,
       auftraggeber: { gelesen: auftraggeberNummern.size, neu: 0, aktualisiert: 0, ohneAdresse: auftraggeberNummern.size },
       projekte: { gelesen: gruppen.length, neu: 0, aktualisiert: 0, uebersprungen },
       konten: { angelegt: 0, vorhanden: 0 },
@@ -118,7 +180,8 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
   const stand = await getZaehler(pool, 'rechnung_lfd_nr');
 
   return {
-    quelle: opts.projekteCsv, modus: 'apply', jahr: jahre.length === 1 ? jahre[0] : null, jahre,
+    quelle: opts.projekteCsv, modus: 'apply', projekteLauf: true, adressen: null,
+    jahr: jahre.length === 1 ? jahre[0] : null, jahre,
     auftraggeber: { gelesen: ag.gelesen, neu: ag.neu, aktualisiert: ag.aktualisiert, ohneAdresse: ag.ohneAdresse },
     projekte: { gelesen: pr.gelesen, neu: pr.neu, aktualisiert: pr.aktualisiert, uebersprungen: pr.uebersprungen },
     konten: stamm.konten, mwstSaetze: stamm.mwstSaetze,
@@ -152,15 +215,22 @@ export function parseRechnungMax(roh: string | undefined): { wert?: number; fehl
   return { wert: n };
 }
 
-// CLI: npm run migrate:fm -- --projekte=../fm-discovery/export/export_daten.csv [--apply] [--rechnung-max=33214]
+// CLI: npm run migrate:fm -- [--projekte=<pfad.csv>] [--adressen=<pfad.csv>] [--apply] [--rechnung-max=33214]
 // pathToFileURL statt manueller string-Bau: unter Windows braucht ein Laufwerkspfad
 // "file:///C:/..." (drei Slashes) — ein simples Template-Literal liefert nur zwei.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = (name: string): string | undefined =>
     process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
   const projekteCsv = arg('projekte');
-  if (!projekteCsv) {
-    console.error('Aufruf: npm run migrate:fm -- --projekte=<pfad.csv> [--apply] [--rechnung-max=<n>]');
+  const adressenCsv = arg('adressen');
+  // --projekte war Pflicht. Der Adressexport kommt aber erst nach dem Projekt-Import;
+  // ein Nachtrag muss allein laufen koennen. Verlangt wird darum nur noch, dass es
+  // ueberhaupt etwas zu tun gibt.
+  if (!projekteCsv && !adressenCsv) {
+    console.error(
+      'Aufruf: npm run migrate:fm -- [--projekte=<pfad.csv>] [--adressen=<pfad.csv>] [--apply] [--rechnung-max=<n>]\n' +
+      'Mindestens eines von --projekte / --adressen wird gebraucht. ' +
+      '--adressen allein traegt die Auftraggeber-Adressen nach.');
     process.exit(2);
   }
   const rechnungMax = parseRechnungMax(arg('rechnung-max'));
@@ -180,11 +250,21 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
   let report: ImportReport;
   try {
-    report = await fuehreMigrationAus(pool, { projekteCsv, modus, rechnungMax: rechnungMax.wert });
+    report = await fuehreMigrationAus(pool, { projekteCsv, adressenCsv, modus, rechnungMax: rechnungMax.wert });
   } catch (e) {
     const fehler = e as NodeJS.ErrnoException;
     if (fehler && typeof fehler.code === 'string' && ['ENOENT', 'EACCES', 'EISDIR', 'ENOTDIR'].includes(fehler.code)) {
-      console.error(`CSV-Datei "${projekteCsv}" kann nicht gelesen werden (${fehler.code}).`);
+      // fehler.path nennt die Datei, an der es wirklich scheiterte — mit zwei moeglichen
+      // Eingabedateien waere ein fest verdrahteter Name schlicht falsch.
+      console.error(`CSV-Datei "${fehler.path ?? projekteCsv ?? adressenCsv}" kann nicht gelesen werden (${fehler.code}).`);
+      await closePool();
+      process.exit(2);
+    }
+    // Der Adressen-Dry-Run liest die Auftraggeber; ohne Schema gibt es nichts zu lesen.
+    if (fehler && (fehler as { code?: string }).code === '42P01') {
+      console.error(
+        'In der Datenbank gibt es noch kein Schema. Der Adressen-Nachtrag setzt den Projekt-Import ' +
+        'voraus: zuerst "npm run migrate:fm -- --projekte=<pfad.csv> --apply" laufen lassen.');
       await closePool();
       process.exit(2);
     }

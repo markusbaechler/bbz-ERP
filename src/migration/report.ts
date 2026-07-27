@@ -1,8 +1,14 @@
+import type { AdressenErgebnis } from './adressen';
+
 export type SummenVergleich = { csv: number; db: number | null; differenz: number | null; ok: boolean };
 
 export type ImportReport = {
   quelle: string;
   modus: 'dry-run' | 'apply';
+  /** false bei einem reinen Adressen-Nachtrag (--adressen ohne --projekte). */
+  projekteLauf: boolean;
+  /** Nur gesetzt, wenn --adressen uebergeben wurde — sonst waechst kein leerer Abschnitt. */
+  adressen: AdressenErgebnis | null;
   /** Gesetzt, wenn der Lauf genau einen Jahrgang betrifft — sonst null. */
   jahr: number | null;
   /** Alle Jahrgaenge, die dieser Lauf uebernommen hat, aufsteigend. */
@@ -75,31 +81,65 @@ const zaehlerStandZeile = (z: ImportReport['zaehler']): string => {
     `Hoechststand steht in FileMaker und liegt darueber.`;
 };
 
+// Der Adress-Nachtrag muss fuer einen Menschen genau eine Frage beantworten: wer ist
+// jetzt fakturierbar und wer nicht. Darum die Trichter-Zahlen von der Datei bis zur
+// geschriebenen Adresse — und danach namentlich, wer weiterhin gesperrt ist.
+const adressenAbschnitt = (a: AdressenErgebnis): string[] => [
+  `## Adressen-Nachtrag`,
+  ``,
+  `**Quelle:** \`${a.quelle}\` · **Modus:** ${a.modus}` +
+    (a.modus === 'dry-run' ? ' (nichts geschrieben — die Zahlen zeigen, was ein `--apply` taete)' : ''),
+  ``,
+  `| Kennzahl | Anzahl |`,
+  `|---|---:|`,
+  `| Zeilen in der Datei | ${a.zeilenGesamt} |`,
+  `| davon Adressen (mit Kunden Nr.) | ${a.eintraege} |`,
+  `| davon einem Auftraggeber zugeordnet | ${a.getroffen} |`,
+  `| ohne Auftraggeber (bewusst nicht angelegt) | ${a.ohneTreffer} |`,
+  `| Adressen ${a.modus === 'apply' ? 'geschrieben' : 'zu schreiben'} | ${a.geschrieben} |`,
+  `| bereits identisch hinterlegt | ${a.unveraendert} |`,
+  `| unvollstaendig, nicht uebernommen | ${a.unvollstaendig} |`,
+  ``,
+  a.nochOhneAdresse.length === 0
+    ? `Alle zugeordneten Auftraggeber haben eine vollstaendige Adresse — keiner ist mehr wegen ` +
+      `\`adresse_unvollstaendig\` von der Festschreibung ausgeschlossen.`
+    : `Weiterhin ohne Adresse und damit **nicht fakturierbar** (${a.nochOhneAdresse.length}): ` +
+      a.nochOhneAdresse.map((x) => `**${x.nummer}** „${x.name}"`).join(', ') +
+      `. Die Festschreibung weist diese Auftraggeber ab, bis die Adresse nachgetragen ist ` +
+      `(\`PUT /auftraggeber/:id\`).`,
+  ``,
+];
+
 export function formatReport(r: ImportReport): string {
   const zeile = (name: string, v: SummenVergleich) =>
     `| ${name} | ${chf(v.csv)} | ${chf(v.db)} | ${v.differenz === null ? '—' : chf(v.differenz)} | ${v.ok ? 'ok' : '**ABWEICHUNG**'} |`;
   return [
     `# Migrations-Report`,
     ``,
-    `**Quelle:** \`${r.quelle}\` · **Modus:** ${r.modus}${jahrgangText(r.jahre)}`,
+    `**Quelle:** \`${r.quelle}\` · **Modus:** ${r.modus}${r.projekteLauf ? jahrgangText(r.jahre) : ''}`,
     ``,
-    `## Uebernommene Datensaetze`,
-    ``,
-    `| Bereich | gelesen | neu | aktualisiert | Hinweis |`,
-    `|---|---:|---:|---:|---|`,
-    `| Auftraggeber | ${r.auftraggeber.gelesen} | ${r.auftraggeber.neu} | ${r.auftraggeber.aktualisiert} | ${r.auftraggeber.ohneAdresse} ohne Adresse |`,
-    `| Projekte | ${r.projekte.gelesen} | ${r.projekte.neu} | ${r.projekte.aktualisiert} | ${r.projekte.uebersprungen} uebersprungen |`,
-    `| Konten | ${r.konten.angelegt + r.konten.vorhanden} | ${r.konten.angelegt} | ${r.konten.vorhanden} | Kontenplan |`,
-    `| MWSt-Saetze | ${r.mwstSaetze.angelegt + r.mwstSaetze.vorhanden} | ${r.mwstSaetze.angelegt} | ${r.mwstSaetze.vorhanden} | Satzhistorie |`,
-    ``,
-    `## Summenabgleich gegen FileMaker`,
-    ``,
-    `| Kennzahl | CSV | Datenbank | Differenz | Status |`,
-    `|---|---:|---:|---:|---|`,
-    zeile('Budget CHF', r.summen.budgetChf),
-    zeile('offen_prov.', r.summen.offenProv),
-    zeile('abgerechnet', r.summen.abgerechnet),
-    ``,
+    // Bei einem reinen Adressen-Nachtrag stuenden hier lauter Nullen und ein leerer
+    // Summenabgleich — das saehe aus wie ein misslungener Projekt-Import.
+    ...(!r.projekteLauf ? [] : [
+      `## Uebernommene Datensaetze`,
+      ``,
+      `| Bereich | gelesen | neu | aktualisiert | Hinweis |`,
+      `|---|---:|---:|---:|---|`,
+      `| Auftraggeber | ${r.auftraggeber.gelesen} | ${r.auftraggeber.neu} | ${r.auftraggeber.aktualisiert} | ${r.auftraggeber.ohneAdresse} ohne Adresse |`,
+      `| Projekte | ${r.projekte.gelesen} | ${r.projekte.neu} | ${r.projekte.aktualisiert} | ${r.projekte.uebersprungen} uebersprungen |`,
+      `| Konten | ${r.konten.angelegt + r.konten.vorhanden} | ${r.konten.angelegt} | ${r.konten.vorhanden} | Kontenplan |`,
+      `| MWSt-Saetze | ${r.mwstSaetze.angelegt + r.mwstSaetze.vorhanden} | ${r.mwstSaetze.angelegt} | ${r.mwstSaetze.vorhanden} | Satzhistorie |`,
+      ``,
+      `## Summenabgleich gegen FileMaker`,
+      ``,
+      `| Kennzahl | CSV | Datenbank | Differenz | Status |`,
+      `|---|---:|---:|---:|---|`,
+      zeile('Budget CHF', r.summen.budgetChf),
+      zeile('offen_prov.', r.summen.offenProv),
+      zeile('abgerechnet', r.summen.abgerechnet),
+      ``,
+    ]),
+    ...(r.adressen === null ? [] : adressenAbschnitt(r.adressen)),
     `## Rechnungszaehler`,
     ``,
     r.zaehler.gesetztAuf === null
