@@ -1,0 +1,5 @@
+Projekt_Nr.;Jahr;Projekt_Name;Projekt_Kürzel;Bereich;Beschrieb;Auftraggeber;Auftraggeber_Nr.;Ansprechperson;Konto;Aufw. Konto;Budget CHF;Budget Tage;Aufw. Budget CHF;offen_prov.;abgerechnet;alte_Projekt_Nr;Referent intern;MWSt;Erstellt durch;geändert durch;Faktura::Erfassungsdatum;Faktura::Total_Summe Übersicht
+123456.26;2026;Zu viele Stellen;;;;Firma A;601;;3010;;100;;;;;;;;;;;
+2001.26;2026;Sauber;;;;Firma B;602;;3010;;1000;;;200;300;;;;;;;
+1285.2;2026;Einstelliges Jahr;;;;Firma C;603;;3010;;200;;;;;;;;;;;
+1285.26a;2026;Buchstabe am Ende;;;;Firma D;604;;3010;;300;;;;;;;;;;;

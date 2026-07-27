@@ -6,6 +6,7 @@ import type { Rechnung, Auftraggeber } from '../src/domain/types';
 const auftraggeber: Auftraggeber = {
   id: 'a1', nummer: '20577', name: 'bbz academy', strasse: 'Zürcherstrasse 202',
   plz: '9014', ort: 'St. Gallen', land: 'CH', ansprechperson: null, email: null, telefon: null, aktiv: true,
+  zusatz: null, adresseUnvollstaendig: false,
 };
 const rechnung: Rechnung = {
   id: 'r1', projektId: 'p1', auftraggeberId: 'a1', datum: '2026-07-23', betreff: 'Test',

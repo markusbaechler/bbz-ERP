@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate": "tsx src/db/migrate.ts",
+    "migrate:fm": "tsx src/migration/run.ts",
     "dev": "tsx watch src/server/main.ts"
   },
   "dependencies": {

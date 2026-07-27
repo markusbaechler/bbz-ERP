@@ -6,6 +6,7 @@ export type Auftraggeber = {
   id: string; nummer: string | null; name: string;
   strasse: string; plz: string; ort: string; land: string;
   ansprechperson: string | null; email: string | null; telefon: string | null; aktiv: boolean;
+  zusatz: string | null; adresseUnvollstaendig: boolean;
 };
 
 export type Projekt = {
@@ -39,4 +40,15 @@ export type Zahlungseingang = {
 export type OffenerPosten = {
   rechnungId: string; nummer: string | null; auftraggeberId: string; datum: string;
   totalBrutto: number; bezahlt: number; offen: number;
+};
+
+export type MigrationProjektInput = {
+  stammnummer: number; jahr: number; name: string; auftraggeberId: string;
+  kuerzel: string | null; bereich: string | null; beschrieb: string | null; ansprechperson: string | null;
+  ertragskontoId: string | null; aufwandKontoId: string | null;
+  budgetChf: number | null; budgetTage: number | null; aufwandBudgetChf: number | null;
+  fmOffenProv: number | null; fmAbgerechnet: number | null;
+  alteProjektNr: string | null; projektleitungKuerzel: string | null;
+  mwstModus: 'exkl' | 'inkl';
+  erstelltDurch: string | null; geaendertDurch: string | null;
 };

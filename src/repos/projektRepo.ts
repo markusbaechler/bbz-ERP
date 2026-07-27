@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import type { Projekt } from '../domain/types';
+import type { Projekt, MigrationProjektInput } from '../domain/types';
 import { ValidationError, NotFoundError } from '../domain/errors';
 
 const map = (r: any): Projekt => ({
@@ -46,4 +46,73 @@ export async function listProjekte(pool: pg.Pool, filter: { jahr?: number; auftr
 export async function getJahresverlauf(pool: pg.Pool, stammnummer: number): Promise<Projekt[]> {
   const r = await pool.query('select * from projekt where stammnummer=$1 order by jahr asc', [stammnummer]);
   return r.rows.map(map);
+}
+
+export async function upsertProjektAusMigration(pool: pg.Pool, input: MigrationProjektInput): Promise<{ projekt: Projekt; neu: boolean }> {
+  if (!input.name?.trim()) throw new ValidationError('name ist Pflicht');
+  if (!input.auftraggeberId) throw new ValidationError('auftraggeberId ist Pflicht');
+  const nummer = `${input.stammnummer}.${String(input.jahr).slice(-2)}`;
+  const r = await pool.query(
+    `insert into projekt(nummer,stammnummer,jahr,name,auftraggeber_id,ertragskonto_id,aufwand_konto_id,
+                         kuerzel,bereich,beschrieb,ansprechperson,budget_chf,budget_tage,aufwand_budget_chf,
+                         fm_offen_prov,fm_abgerechnet,alte_projekt_nr,projektleitung_kuerzel,mwst_modus,
+                         erstellt_durch,geaendert_durch)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+     on conflict (stammnummer, jahr) do update set
+       name=excluded.name, auftraggeber_id=excluded.auftraggeber_id,
+       ertragskonto_id=excluded.ertragskonto_id, aufwand_konto_id=excluded.aufwand_konto_id,
+       kuerzel=excluded.kuerzel, bereich=excluded.bereich, beschrieb=excluded.beschrieb,
+       ansprechperson=excluded.ansprechperson, budget_chf=excluded.budget_chf,
+       budget_tage=excluded.budget_tage, aufwand_budget_chf=excluded.aufwand_budget_chf,
+       fm_offen_prov=excluded.fm_offen_prov, fm_abgerechnet=excluded.fm_abgerechnet,
+       alte_projekt_nr=excluded.alte_projekt_nr, projektleitung_kuerzel=excluded.projektleitung_kuerzel,
+       mwst_modus=excluded.mwst_modus, geaendert_durch=excluded.geaendert_durch, geaendert_am=now()
+     returning *, (xmax = 0) as neu`,
+    [nummer, input.stammnummer, input.jahr, input.name, input.auftraggeberId,
+     input.ertragskontoId, input.aufwandKontoId, input.kuerzel, input.bereich, input.beschrieb,
+     input.ansprechperson, input.budgetChf, input.budgetTage, input.aufwandBudgetChf,
+     input.fmOffenProv, input.fmAbgerechnet, input.alteProjektNr, input.projektleitungKuerzel,
+     input.mwstModus, input.erstelltDurch, input.geaendertDurch]);
+  return { projekt: map(r.rows[0]), neu: r.rows[0].neu };
+}
+
+export type ProjektSchluessel = { stammnummer: number; jahr: number };
+/** Betraege sind null, wenn es nichts zu summieren gab — nicht 0. */
+export type ProjektSummen = { anzahl: number; budgetChf: number | null; offenProv: number | null; abgerechnet: number | null };
+
+// Summen ueber genau die uebergebenen Projekte. Der Migrations-Abgleich darf weder
+// Projekte mitzaehlen, die nicht aus diesem Export stammen (z.B. per REST erfasste),
+// noch Jahrgaenge auslassen, wenn eine Datei mehrere enthaelt.
+export async function projektSummenFuerSchluessel(pool: pg.Pool, schluessel: ProjektSchluessel[]): Promise<ProjektSummen> {
+  // Leere Schluesselliste heisst "nichts uebernommen". Mit 0/0/0 haette der Abgleich
+  // einen erfolgreichen Vergleich von nichts behauptet ("0.00 | 0.00 | 0.00 | ok");
+  // null wird im Report als "—" gerendert und sagt die Wahrheit.
+  if (schluessel.length === 0) return { anzahl: 0, budgetChf: null, offenProv: null, abgerechnet: null };
+  // Ohne Dubletten: zwei Export-Zeilen mit derselben Projekt_Nr. liefern denselben
+  // Schluessel zweimal, das join unnest(...) traefe dieselbe Zeile zweimal und
+  // verdoppelte Summe *und* anzahl. Die CSV-Seite zaehlt beide Zeilen — die Differenz
+  // ist genau die Abweichung, die der Abgleich zeigen soll.
+  const eindeutig = [...new Map(schluessel.map((s) => [`${s.stammnummer}.${s.jahr}`, s])).values()];
+  const r = await pool.query(
+    `select count(*)::int as anzahl,
+            coalesce(sum(p.budget_chf),0)::numeric      as budget_chf,
+            coalesce(sum(p.fm_offen_prov),0)::numeric   as offen_prov,
+            coalesce(sum(p.fm_abgerechnet),0)::numeric  as abgerechnet
+     from projekt p
+     join unnest($1::int[], $2::int[]) as k(stammnummer, jahr)
+       on p.stammnummer = k.stammnummer and p.jahr = k.jahr`,
+    [eindeutig.map((s) => s.stammnummer), eindeutig.map((s) => s.jahr)]);
+  const row = r.rows[0];
+  return { anzahl: row.anzahl, budgetChf: Number(row.budget_chf), offenProv: Number(row.offen_prov), abgerechnet: Number(row.abgerechnet) };
+}
+
+export async function projektSummen(pool: pg.Pool, jahr: number): Promise<{ anzahl: number; budgetChf: number; offenProv: number; abgerechnet: number }> {
+  const r = await pool.query(
+    `select count(*)::int as anzahl,
+            coalesce(sum(budget_chf),0)::numeric   as budget_chf,
+            coalesce(sum(fm_offen_prov),0)::numeric as offen_prov,
+            coalesce(sum(fm_abgerechnet),0)::numeric as abgerechnet
+     from projekt where jahr=$1`, [jahr]);
+  const row = r.rows[0];
+  return { anzahl: row.anzahl, budgetChf: Number(row.budget_chf), offenProv: Number(row.offen_prov), abgerechnet: Number(row.abgerechnet) };
 }
