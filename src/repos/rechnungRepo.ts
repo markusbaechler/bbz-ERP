@@ -4,6 +4,7 @@ import { berechneMwst, rappenRunden } from '../domain/mwst';
 import { ValidationError, NotFoundError } from '../domain/errors';
 import { getProjektById } from './projektRepo';
 import { getAuftraggeberById } from './auftraggeberRepo';
+import { zaehlerGesperrt, zaehlerSperrText } from '../config/rechnungszaehler';
 
 const mapR = (r: any): Rechnung => ({
   id: r.id, projektId: r.projekt_id, auftraggeberId: r.auftraggeber_id, datum: r.datum,
@@ -87,7 +88,16 @@ export async function festschreiben(pool: pg.Pool, rechnungId: string, ersteller
         `Sonst verbraucht sie eine unwiderrufliche Rechnungsnummer fuer einen nicht zustellbaren Beleg.`);
     }
 
-    // Lueckenloser Zaehler: Sperre haelt bis commit/rollback -> bei Fehler keine Luecke
+    // Lueckenloser Zaehler: Sperre haelt bis commit/rollback -> bei Fehler keine Luecke.
+    // Zuerst lesen und pruefen, dann erst erhoehen — genau wie bei der Adress-Pruefung
+    // darf keine Nummer verbraucht sein, wenn wir abbrechen. Der Zaehler startet nach
+    // der Migration bei 0; steht er nicht ueber der Untergrenze, ist er noch nicht auf
+    // den FileMaker-Stand gesetzt und die naechste Nummer waere eine Dublette.
+    const zs = await client.query(`select wert from zaehler where name='rechnung_lfd_nr' for update`);
+    if (!zs.rowCount) throw new NotFoundError('Zaehler rechnung_lfd_nr nicht gefunden');
+    const stand = Number(zs.rows[0].wert);
+    if (zaehlerGesperrt(stand)) throw new ValidationError(zaehlerSperrText(stand));
+
     const z = await client.query(`update zaehler set wert = wert + 1 where name='rechnung_lfd_nr' returning wert`);
     const lfdNr: number = z.rows[0].wert;
 

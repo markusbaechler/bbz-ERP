@@ -4,12 +4,16 @@ import { resetDb } from './helpers/db';
 import { createAuftraggeber, upsertAuftraggeberAusMigration, updateAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { createProjekt } from '../src/repos/projektRepo';
 import { createRechnung, addPosition, festschreiben } from '../src/repos/rechnungRepo';
-import { getZaehler } from '../src/repos/zaehlerRepo';
+import { getZaehler, setzeRechnungZaehler } from '../src/repos/zaehlerRepo';
 import { ValidationError } from '../src/domain/errors';
 
 let projektId: string; let auftraggeberId: string;
 beforeAll(async () => {
   await resetDb(getPool());
+  // Ausgangslage wie nach einem echten Deployment: der Zaehler steht auf dem aus
+  // FileMaker abgelesenen Hoechststand. Ohne das blockt die Untergrenze jede
+  // Festschreibung (src/config/rechnungszaehler.ts) — geprueft in zaehlerSperre.test.ts.
+  await setzeRechnungZaehler(getPool(), 33214);
   auftraggeberId = (await createAuftraggeber(getPool(), { name: 'Urner KB', strasse: 'Bahnhofstr. 1', plz: '6460', ort: 'Altdorf' })).id;
   projektId = (await createProjekt(getPool(), { stammnummer: 6231, jahr: 2026, name: 'Test', auftraggeberId })).id;
 });
@@ -25,11 +29,12 @@ describe('festschreiben', () => {
   it('vergibt lückenlose lfdNr und baut nummer', async () => {
     const a = await festschreiben(getPool(), await draftMitPosition(), 'ml');
     const b = await festschreiben(getPool(), await draftMitPosition(), 'ml');
-    expect(a.lfdNr).toBe(1);
-    expect(b.lfdNr).toBe(2);
+    // Fortsetzung des FileMaker-Stands 33214, nicht Neustart bei 1.
+    expect(a.lfdNr).toBe(33215);
+    expect(b.lfdNr).toBe(33216);
     expect(a.status).toBe('abgerechnet');
-    expect(a.nummer).toBe('6231.26 - 1 ml');
-    expect(b.nummer).toBe('6231.26 - 2 ml');
+    expect(a.nummer).toBe('6231.26 - 33215 ml');
+    expect(b.nummer).toBe('6231.26 - 33216 ml');
   });
   it('verweigert Festschreibung ohne Positionen', async () => {
     const r = await createRechnung(getPool(), { projektId, auftraggeberId, datum: '2026-07-23' });
