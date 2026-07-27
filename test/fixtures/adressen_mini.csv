@@ -1,0 +1,10 @@
+Firma;Kunden Nr.;Land;Mail_Rechnung;Ort;PLZ;Strasse;Strasse_Nr.;Z'bedingungen
+Connect KB WOB;1285;CH;rechnung@connect.example;Luzern;6003;Bahnhofstrasse;3;30 Tage netto
+;;;;;;;;
+"Universität St. Gallen
+Institut für Banken und Finanzen";1260;;;St. Gallen;9000;"Unterer Graben 21
+Postfach";;20 Tage netto
+;;;;;;;;
+bbz st.gallen ag;20577;;;;;;;
+Liechtensteinische Landesbank AG;1124;FL;;Vaduz;9490;Städtle 44;;
+Nicht in der Datenbank AG;88888;CH;;Zürich;8001;Musterweg 1;;
