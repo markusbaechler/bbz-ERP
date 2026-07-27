@@ -91,6 +91,26 @@ describe('Report', () => {
     expect(r.warnungen.some((w) => w.includes('angenommen'))).toBe(false);
   });
 
+  // Laeuft der Nachtrag vor dem Projekt-Import, trifft keine Zeile. "Alle Auftraggeber
+  // haben eine vollstaendige Adresse" waere dann formal wahr und trotzdem irrefuehrend.
+  it('sagt es, wenn keine einzige Zeile einen Auftraggeber trifft', async () => {
+    await resetDb(getPool());
+    const r = await fuehreMigrationAus(getPool(), { adressenCsv: adressen, modus: 'dry-run' });
+    const md = formatReport(r);
+    expect(r.adressen!.getroffen).toBe(0);
+    expect(md).toContain('Keine Zeile');
+    expect(md).not.toContain('Alle zugeordneten Auftraggeber');
+  });
+
+  // Der Adress-Dry-Run liest die Datenbank ohnehin (die Zuordnung entsteht erst an ihr) —
+  // dann darf er auch den Zaehlerstand nennen, statt "im Dry-Run nicht gelesen" zu behaupten.
+  it('nennt im Adressen-Dry-Run den Zaehlerstand statt ihn zu verschweigen', async () => {
+    const r = await fuehreMigrationAus(getPool(), { adressenCsv: adressen, modus: 'dry-run' });
+    expect(r.zaehler.stand).toBe(0);
+    expect(r.zaehler.gesperrt).toBe(true);
+    expect(formatReport(r)).not.toContain('fasst die Datenbank nicht an');
+  });
+
   it('nimmt beide Dateien in einem Lauf — erst Projekte, dann Adressen', async () => {
     await resetDb(getPool());
     const r = await fuehreMigrationAus(getPool(), { projekteCsv: projekte, adressenCsv: adressen, modus: 'apply' });

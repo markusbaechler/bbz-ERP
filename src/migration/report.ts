@@ -100,7 +100,11 @@ const adressenAbschnitt = (a: AdressenErgebnis): string[] => [
   `| bereits identisch hinterlegt | ${a.unveraendert} |`,
   `| unvollstaendig, nicht uebernommen | ${a.unvollstaendig} |`,
   ``,
-  a.nochOhneAdresse.length === 0
+  // Ohne Treffer waere "alle haben eine Adresse" formal wahr und trotzdem irrefuehrend.
+  a.getroffen === 0
+    ? `**Keine Zeile der Datei traf einen Auftraggeber.** Der Nachtrag aktualisiert nur bestehende ` +
+      `Auftraggeber und legt nie einen an — steht der Projekt-Import noch aus?`
+    : a.nochOhneAdresse.length === 0
     ? `Alle zugeordneten Auftraggeber haben eine vollstaendige Adresse — keiner ist mehr wegen ` +
       `\`adresse_unvollstaendig\` von der Festschreibung ausgeschlossen.`
     : `Weiterhin ohne Adresse und damit **nicht fakturierbar** (${a.nochOhneAdresse.length}): ` +

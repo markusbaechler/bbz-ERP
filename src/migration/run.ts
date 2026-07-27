@@ -52,7 +52,9 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
     const adressen = await importAdressen(pool, {
       quelle: opts.adressenCsv!, text: readFileSync(opts.adressenCsv!, 'utf8'), modus: opts.modus,
     });
-    const stand = opts.modus === 'apply' ? await getZaehler(pool, 'rechnung_lfd_nr') : null;
+    // Auch im Dry-Run: dieser Lauf liest die Datenbank ohnehin, dann kann er dem
+    // Operator auch sagen, ob die Festschreibung noch von der Untergrenze blockiert wird.
+    const stand = await getZaehler(pool, 'rechnung_lfd_nr');
     return {
       quelle: opts.adressenCsv!, modus: opts.modus, projekteLauf: false, jahr: null, jahre: [],
       auftraggeber: { gelesen: 0, neu: 0, aktualisiert: 0, ohneAdresse: adressen.nochOhneAdresse.length },
@@ -60,8 +62,7 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
       konten: { angelegt: 0, vorhanden: 0 },
       mwstSaetze: { angelegt: 0, vorhanden: 0 },
       zaehler: {
-        gesetztAuf: null, stand, untergrenze: rechnungNrUntergrenze(),
-        gesperrt: stand === null ? null : zaehlerGesperrt(stand),
+        gesetztAuf: null, stand, untergrenze: rechnungNrUntergrenze(), gesperrt: zaehlerGesperrt(stand),
         hinweis: 'Adressen-Nachtrag: der Zaehler wird hier nicht angefasst.',
       },
       summen: {
@@ -82,9 +83,13 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
   const adressen = await importAdressen(pool, {
     quelle: opts.adressenCsv, text: readFileSync(opts.adressenCsv, 'utf8'), modus: opts.modus,
   });
+  // Auch im kombinierten Dry-Run wurde die Datenbank durch den Adressteil gelesen —
+  // dann darf der Report den Zaehlerstand nennen statt "nicht gelesen" zu behaupten.
+  const stand = report.zaehler.stand ?? await getZaehler(pool, 'rechnung_lfd_nr');
   return {
     ...report,
     adressen,
+    zaehler: { ...report.zaehler, stand, gesperrt: zaehlerGesperrt(stand) },
     auftraggeber: { ...report.auftraggeber, ohneAdresse: adressen.nochOhneAdresse.length },
     warnungen: [...report.warnungen, ...adressen.warnungen],
     datenbefunde: [...report.datenbefunde, ...adressen.datenbefunde],
