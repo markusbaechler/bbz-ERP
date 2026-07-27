@@ -23,7 +23,9 @@ export async function createAuftraggeber(pool: pg.Pool, input: {
   return map(r.rows[0]);
 }
 
-export async function getAuftraggeberById(pool: pg.Pool, id: string): Promise<Auftraggeber> {
+// Nimmt Pool oder Client: die Festschreibung muss den Auftraggeber innerhalb ihrer
+// eigenen Transaktion lesen (siehe rechnungRepo.festschreiben).
+export async function getAuftraggeberById(pool: pg.Pool | pg.PoolClient, id: string): Promise<Auftraggeber> {
   const r = await pool.query('select * from auftraggeber where id=$1', [id]);
   if (!r.rowCount) throw new NotFoundError(`Auftraggeber ${id} nicht gefunden`);
   return map(r.rows[0]);

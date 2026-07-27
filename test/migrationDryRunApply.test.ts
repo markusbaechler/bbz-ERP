@@ -14,6 +14,10 @@ import { fuehreMigrationAus } from '../src/migration/run';
 //   Dry-Run-Vorschau dieselbe Zahlenauswertung (fmZahl) nutzt wie der Apply-Import.
 const luecken = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/projekte_mit_luecken.csv');
 
+// Drei Projekt_Nr., die nicht dem Format <Stammnummer>.<JJ> entsprechen — die erste
+// gleich in der ersten Zeile, damit auch die Jahr-Ableitung des Reports geprueft wird.
+const krumm = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/projekte_krumme_nummer.csv');
+
 beforeAll(async () => { await resetDb(getPool()); });
 afterAll(async () => { await closePool(); });
 
@@ -43,5 +47,27 @@ describe('Dry-Run und Apply auf einer Datei mit uebersprungenen Projekten', () =
     // (kein Name in irgendeiner Zeile).
     expect(dry.auftraggeber.gelesen).toBe(3);
     expect(apply.auftraggeber.gelesen).toBe(3);
+  });
+});
+
+describe('Projekt_Nr. ohne das Format <Stammnummer>.<JJ>', () => {
+  it('wird in beiden Modi uebersprungen statt den Lauf abzubrechen', async () => {
+    const dry = await fuehreMigrationAus(getPool(), { projekteCsv: krumm, modus: 'dry-run' });
+    const apply = await fuehreMigrationAus(getPool(), { projekteCsv: krumm, modus: 'apply' });
+
+    expect(dry.projekte.gelesen).toBe(4);
+    expect(apply.projekte.gelesen).toBe(4);
+    expect(dry.projekte.uebersprungen).toBe(3);   // 123456.26, 1285.2, 1285.26a
+    expect(apply.projekte.uebersprungen).toBe(3);
+    expect(apply.projekte.neu).toBe(1);           // nur 2001.26
+
+    // Der Skip-Grund ist derselbe Text in beiden Modi.
+    const format = (ws: string[]) => ws.filter((w) => w.includes('Format')).sort();
+    expect(format(dry.warnungen)).toHaveLength(3);
+    expect(format(dry.warnungen)).toEqual(format(apply.warnungen));
+
+    // Nur die uebernommenen Betraege zaehlen — die drei krummen Zeilen nicht.
+    expect(apply.summen.budgetChf.csv).toBeCloseTo(1000, 2);
+    expect(dry.summen.budgetChf.csv).toBeCloseTo(1000, 2);
   });
 });

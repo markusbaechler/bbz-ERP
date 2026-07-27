@@ -21,10 +21,18 @@ export function fmDatum(v: string | undefined): string | null {
   return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 }
 
+export const PROJEKT_NUMMER_FORMAT = /^(\d{1,5})\.(\d{2})$/;
+
+// Vorpruefung ohne Exception: der Import muss eine krumme Nummer als "uebersprungen"
+// melden koennen, statt mitten im Lauf abzubrechen.
+export function istProjektNummer(v: string | null | undefined): boolean {
+  return PROJEKT_NUMMER_FORMAT.test((v ?? '').trim());
+}
+
 // '6231.26' -> Stammnummer 6231, Jahr 2026. Pivot 89: Werte darueber gelten als 19xx.
 export function fmProjektNummer(v: string): { stammnummer: number; jahr: number } {
   const t = (v ?? '').trim();
-  const m = /^(\d{1,5})\.(\d{2})$/.exec(t);
+  const m = PROJEKT_NUMMER_FORMAT.exec(t);
   if (!m) throw new ValidationError(`Projekt_Nr. "${v}" hat nicht das Format <Stammnummer>.<JJ>`);
   const jj = Number(m[2]);
   return { stammnummer: Number(m[1]), jahr: jj <= 89 ? 2000 + jj : 1900 + jj };

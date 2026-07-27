@@ -7,7 +7,7 @@ import { importStammdaten } from './stammdaten';
 import { importAuftraggeber, sammleAuftraggeber } from './auftraggeber';
 import { importProjekte, projektUebersprungenGrund } from './projekte';
 import { vergleiche, formatReport, type ImportReport } from './report';
-import { fmProjektNummer, fmText, fmZahl } from './normalize';
+import { fmProjektNummer, istProjektNummer, fmText, fmZahl } from './normalize';
 import { projektSummen } from '../repos/projektRepo';
 import { setzeRechnungZaehler } from '../repos/zaehlerRepo';
 
@@ -22,9 +22,10 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
   const { records } = csvRecords(readFileSync(opts.projekteCsv, 'utf8'));
   const gruppen = gruppiereProjekte(records);
 
-  // Jahr aus der ersten Projektnummer — der Export ist jahresweise (Befund B1).
-  const ersteNr = fmText(gruppen[0]?.projekt['Projekt_Nr.']);
-  const jahr = ersteNr === null ? null : fmProjektNummer(ersteNr).jahr;
+  // Jahr aus der ersten *lesbaren* Projektnummer — der Export ist jahresweise (Befund B1).
+  // Eine krumme Nummer darf hier nicht werfen; sie wird weiter unten als uebersprungen gemeldet.
+  const ersteNr = gruppen.map((g) => fmText(g.projekt['Projekt_Nr.'])).find((n) => istProjektNummer(n));
+  const jahr = ersteNr === undefined ? null : fmProjektNummer(ersteNr!).jahr;
 
   if (opts.modus === 'dry-run') {
     // Kein Schreibzugriff: nur zaehlen, was der Export enthaelt — mit denselben

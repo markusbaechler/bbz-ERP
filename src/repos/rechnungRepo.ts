@@ -3,6 +3,7 @@ import type { Rechnung, Rechnungsposition } from '../domain/types';
 import { berechneMwst, rappenRunden } from '../domain/mwst';
 import { ValidationError, NotFoundError } from '../domain/errors';
 import { getProjektById } from './projektRepo';
+import { getAuftraggeberById } from './auftraggeberRepo';
 
 const mapR = (r: any): Rechnung => ({
   id: r.id, projektId: r.projekt_id, auftraggeberId: r.auftraggeber_id, datum: r.datum,
@@ -72,6 +73,18 @@ export async function festschreiben(pool: pg.Pool, rechnungId: string, ersteller
     }
     const pc = await client.query('select count(*)::int as n from rechnungsposition where rechnung_id=$1', [rechnungId]);
     if (pc.rows[0].n === 0) throw new ValidationError('Rechnung ohne Positionen kann nicht festgeschrieben werden');
+
+    // Vor dem Zaehler: aus der Migration stammende Auftraggeber haben keine Adresse
+    // (adresse_unvollstaendig, Befund B3). Die Rechnungsnummer ist nach Spec §6.1
+    // unwiderruflich vergeben — sie darf nicht fuer einen Beleg verbraucht werden,
+    // der mangels Debitor-Adresse gar nicht zustellbar ist (kein QR-Zahlteil moeglich).
+    const auftraggeber = await getAuftraggeberById(client, rechnung.auftraggeberId);
+    if (auftraggeber.adresseUnvollstaendig) {
+      throw new ValidationError(
+        `Auftraggeber ${auftraggeber.nummer ?? auftraggeber.id} "${auftraggeber.name}" hat keine vollstaendige Adresse ` +
+        `(Strasse/PLZ/Ort fehlen aus der FileMaker-Migration). Die Adresse muss zuerst ergaenzt werden; ` +
+        `sonst verbraucht die Festschreibung eine unwiderrufliche Rechnungsnummer fuer einen nicht zustellbaren Beleg.`);
+    }
 
     // Lueckenloser Zaehler: Sperre haelt bis commit/rollback -> bei Fehler keine Luecke
     const z = await client.query(`update zaehler set wert = wert + 1 where name='rechnung_lfd_nr' returning wert`);

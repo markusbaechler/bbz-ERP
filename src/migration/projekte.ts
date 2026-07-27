@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import type { ProjektGruppe } from './gruppen';
 import type { MigrationProjektInput } from '../domain/types';
-import { fmText, fmZahl, fmProjektNummer, fmBereich } from './normalize';
+import { fmText, fmZahl, fmProjektNummer, istProjektNummer, fmBereich } from './normalize';
 import { findKontoByNummer } from '../repos/kontoRepo';
 import { upsertProjektAusMigration } from '../repos/projektRepo';
 
@@ -20,6 +20,12 @@ export function projektUebersprungenGrund(g: ProjektGruppe, auftraggeberNummern:
   const p = g.projekt;
   const name = fmText(p['Projekt_Name']);
   const auftraggeberNr = fmText(p['Auftraggeber_Nr.']);
+  // Zuerst die Nummer: ohne sie gibt es weder Stammnummer noch Jahr. Frueher warf
+  // erst fmProjektNummer weiter unten — das riss den ganzen Lauf mit Teilschreibungen
+  // ab und liess den Dry-Run die Zeile faelschlich als importierbar zaehlen.
+  if (!istProjektNummer(fmText(p['Projekt_Nr.']))) {
+    return 'Projekt_Nr. hat nicht das Format <Stammnummer>.<JJ> — uebersprungen';
+  }
   if (name === null) return 'ohne Projekt_Name uebersprungen';
   if (auftraggeberNr === null || !auftraggeberNummern.has(auftraggeberNr)) {
     return `Auftraggeber-Nr. "${auftraggeberNr}" nicht importiert — uebersprungen`;
