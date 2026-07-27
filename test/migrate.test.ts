@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getPool, closePool } from '../src/db/pool';
@@ -25,8 +25,8 @@ describe('migrations', () => {
   it('fuehrt die Migrationen aus, wenn src/db/migrate.ts direkt gestartet wird', async () => {
     const pool = getPool();
     await pool.query('drop schema public cascade; create schema public;');
-    const out = execFileSync('npx', ['tsx', 'src/db/migrate.ts'], {
-      cwd: repo, encoding: 'utf8', shell: true,
+    const out = execSync('npx tsx src/db/migrate.ts', {
+      cwd: repo, encoding: 'utf8',
       env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://bbz:bbz@localhost:5433/bbz_test' },
     });
     expect(out).toContain('migrations applied');
