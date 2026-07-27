@@ -118,6 +118,22 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
   };
 }
 
+// CLI-Grenze: --rechnung-max muss hier validiert werden. `Number('abc')` lieferte NaN
+// und schlug erst tief in setzeRechnungZaehler als Stacktrace auf; `--rechnung-max=`
+// wurde klaglos zu 0 und damit zu einem stillen Zaehler-Rueckwaertssetzen-Versuch.
+export function parseRechnungMax(roh: string | undefined): { wert?: number; fehler?: string } {
+  if (roh === undefined) return {};
+  const t = roh.trim();
+  const n = Number(t);
+  if (!/^\d+$/.test(t) || !Number.isSafeInteger(n) || n <= 0) {
+    return {
+      fehler: `--rechnung-max="${roh}" ist keine positive Ganzzahl. Erwartet wird der aktuelle ` +
+        `Hoechststand der Rechnungsnummer aus FileMaker, z.B. --rechnung-max=33214.`,
+    };
+  }
+  return { wert: n };
+}
+
 // CLI: npm run migrate:fm -- --projekte=../fm-discovery/export/export_daten.csv [--apply] [--rechnung-max=33214]
 // pathToFileURL statt manueller string-Bau: unter Windows braucht ein Laufwerkspfad
 // "file:///C:/..." (drei Slashes) — ein simples Template-Literal liefert nur zwei.
@@ -129,7 +145,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error('Aufruf: npm run migrate:fm -- --projekte=<pfad.csv> [--apply] [--rechnung-max=<n>]');
     process.exit(2);
   }
-  const rechnungMaxArg = arg('rechnung-max');
+  const rechnungMax = parseRechnungMax(arg('rechnung-max'));
+  if (rechnungMax.fehler) {
+    console.error(rechnungMax.fehler);
+    process.exit(2);
+  }
   const modus: 'dry-run' | 'apply' = process.argv.includes('--apply') ? 'apply' : 'dry-run';
   const { getPool, closePool } = await import('../db/pool');
   const pool = getPool();
@@ -142,11 +162,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
   let report: ImportReport;
   try {
-    report = await fuehreMigrationAus(pool, {
-      projekteCsv,
-      modus,
-      rechnungMax: rechnungMaxArg === undefined ? undefined : Number(rechnungMaxArg),
-    });
+    report = await fuehreMigrationAus(pool, { projekteCsv, modus, rechnungMax: rechnungMax.wert });
   } catch (e) {
     const fehler = e as NodeJS.ErrnoException;
     if (fehler && typeof fehler.code === 'string' && ['ENOENT', 'EACCES', 'EISDIR', 'ENOTDIR'].includes(fehler.code)) {

@@ -34,4 +34,21 @@ describe('importStammdaten', () => {
     expect((await findGueltigenSatz(getPool(), 2.6, '2026-01-01')).bezeichnung).toBe('Reduziert');
     expect((await findGueltigenSatz(getPool(), 0, '2026-01-01')).bezeichnung).toBe('Befreit/ausgenommen');
   });
+
+  // 3.8 ist der einzige Satz, der zweimal mit disjunkten Perioden vorkommt
+  // (Beherbergung 2011–2017 und wieder ab 2024). Genau die Zeile, die beim
+  // "Aufraeumen" der Liste als Dublette geloescht wuerde.
+  it('loest den doppelt vorkommenden Satz 3.8 je nach Datum auf die richtige Periode auf', async () => {
+    const alt = await findGueltigenSatz(getPool(), 3.8, '2015-05-01');
+    expect(alt.gueltigAb).toBe('2011-01-01');
+    expect(alt.gueltigBis).toBe('2017-12-31');
+
+    const neu = await findGueltigenSatz(getPool(), 3.8, '2026-05-01');
+    expect(neu.gueltigAb).toBe('2024-01-01');
+    expect(neu.gueltigBis).toBeNull();
+
+    // In der Luecke dazwischen galt 3.7 — 3.8 darf dort nicht gefunden werden.
+    await expect(findGueltigenSatz(getPool(), 3.8, '2020-05-01')).rejects.toThrow();
+    expect((await findGueltigenSatz(getPool(), 3.7, '2020-05-01')).bezeichnung).toBe('Beherbergung');
+  });
 });

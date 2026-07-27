@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type pg from 'pg';
 
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '../../db/migrations');
@@ -28,7 +28,10 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
 }
 
 // CLI: `npm run migrate`
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+// pathToFileURL statt manueller string-Bau: unter Windows braucht ein Laufwerkspfad
+// "file:///C:/..." (drei Slashes) — der frueher hier gebaute String hatte nur zwei,
+// die Bedingung war nie wahr und `npm run migrate` still wirkungslos.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { getPool, closePool } = await import('./pool');
   await runMigrations(getPool());
   await closePool();

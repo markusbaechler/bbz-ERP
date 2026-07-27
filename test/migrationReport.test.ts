@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { getPool, closePool } from '../src/db/pool';
 import { resetDb } from './helpers/db';
 import { vergleiche, formatReport } from '../src/migration/report';
-import { fuehreMigrationAus } from '../src/migration/run';
+import { fuehreMigrationAus, parseRechnungMax } from '../src/migration/run';
 import { getZaehler } from '../src/repos/zaehlerRepo';
 import { listProjekte } from '../src/repos/projektRepo';
 
@@ -19,6 +19,32 @@ describe('vergleiche', () => {
     expect(vergleiche(100.0, 100.01).ok).toBe(true);
     expect(vergleiche(100.0, 100.05).ok).toBe(false);
     expect(vergleiche(100.0, null)).toEqual({ csv: 100.0, db: null, differenz: null, ok: true });
+  });
+
+  // Jeder Betrag wird als numeric(12,2) gespeichert: je Projekt bis zu ein halber
+  // Rappen Rundung. Ueber ~4967 Projekte ist eine feste Toleranz von 0.01 zu eng
+  // und wuerde einen korrekten Lauf als ABWEICHUNG melden.
+  it('skaliert die Toleranz mit der Zahl der summierten Projekte', () => {
+    expect(vergleiche(100.0, 100.5, 4967).ok).toBe(true);    // 0.50 << 0.01 + 4967*0.005
+    expect(vergleiche(100.0, 100.5, 3).ok).toBe(false);      // bei 3 Projekten nicht
+    expect(vergleiche(100.0, 100.02, 3).ok).toBe(true);      // 0.02 <= 0.01 + 3*0.005
+    expect(vergleiche(100.0, 130.0, 4967).ok).toBe(false);   // grobe Abweichung faellt weiter auf
+  });
+});
+
+describe('parseRechnungMax (CLI-Grenze)', () => {
+  it('nimmt eine positive Ganzzahl an', () => {
+    expect(parseRechnungMax('33214')).toEqual({ wert: 33214 });
+    expect(parseRechnungMax(undefined)).toEqual({});
+  });
+
+  it('weist alles zurueck, was als NaN oder 0 im Zaehler landen wuerde', () => {
+    for (const roh of ['abc', '', '  ', '-5', '0', '3.5', '1e5', '999999999999999999999']) {
+      const r = parseRechnungMax(roh);
+      expect(r.wert, `"${roh}" haette den Zaehler erreicht`).toBeUndefined();
+      expect(r.fehler).toBeTruthy();
+      expect(r.fehler).toContain('rechnung-max');
+    }
   });
 });
 

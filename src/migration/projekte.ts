@@ -97,8 +97,11 @@ export function projektUebersprungenGrund(g: ProjektGruppe, auftraggeberNummern:
     return 'Projekt_Nr. hat nicht das Format <Stammnummer>.<JJ> — uebersprungen';
   }
   if (name === null) return 'ohne Projekt_Name uebersprungen';
-  if (auftraggeberNr === null || !auftraggeberNummern.has(auftraggeberNr)) {
-    return `Auftraggeber-Nr. "${auftraggeberNr}" nicht importiert — uebersprungen`;
+  // Die beiden Faelle sind fuer den Leser des Reports verschieden: einmal fehlt die
+  // Nummer im Export, einmal ist sie da, aber der Auftraggeber selbst nicht uebernehmbar.
+  if (auftraggeberNr === null) return 'ohne Auftraggeber-Nr. — uebersprungen';
+  if (!auftraggeberNummern.has(auftraggeberNr)) {
+    return `Auftraggeber-Nr. ${auftraggeberNr} nicht importierbar (kein Name im Export) — uebersprungen`;
   }
   return null;
 }

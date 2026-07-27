@@ -17,9 +17,14 @@ export async function createMwstSatz(pool: pg.Pool, input: { satz: number; bezei
   return map(r.rows[0]);
 }
 
+// order by gueltig_ab desc: die Satzhistorie soll ueberschneidungsfreie Fenster haben,
+// aber weder Schema noch Constraint erzwingt das. Ohne Sortierung waere das Ergebnis
+// bei einer kuenftigen Ueberlappung von der Planwahl abhaengig — mit ihr gewinnt
+// definiert der zuletzt in Kraft gesetzte Satz.
 export async function findGueltigenSatz(pool: pg.Pool, satz: number, datum: string): Promise<MwstSatz> {
   const r = await pool.query(
-    `select * from mwst_satz where satz=$1 and gueltig_ab<=$2 and (gueltig_bis is null or gueltig_bis>=$2) limit 1`,
+    `select * from mwst_satz where satz=$1 and gueltig_ab<=$2 and (gueltig_bis is null or gueltig_bis>=$2)
+     order by gueltig_ab desc limit 1`,
     [satz, datum]);
   if (!r.rowCount) throw new NotFoundError(`Kein MWSt-Satz ${satz} gültig am ${datum}`);
   return map(r.rows[0]);
