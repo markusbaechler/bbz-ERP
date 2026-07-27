@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getPool, closePool } from '../src/db/pool';
 import { resetDb } from './helpers/db';
-import { createAuftraggeber, upsertAuftraggeberAusMigration } from '../src/repos/auftraggeberRepo';
+import { createAuftraggeber, upsertAuftraggeberAusMigration, updateAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { createProjekt } from '../src/repos/projektRepo';
 import { createRechnung, addPosition, festschreiben } from '../src/repos/rechnungRepo';
 import { getZaehler } from '../src/repos/zaehlerRepo';
@@ -56,6 +56,30 @@ describe('festschreiben', () => {
     await expect(festschreiben(getPool(), r.id)).rejects.toBeInstanceOf(ValidationError);
     await expect(festschreiben(getPool(), r.id)).rejects.toThrow(/Adresse/);
     expect(await getZaehler(getPool(), 'rechnung_lfd_nr')).toBe(vorher);
+  });
+
+  // Der Weg aus der Sperre heraus: die Fehlermeldung verlangt eine vollstaendige Adresse,
+  // und genau die traegt updateAuftraggeber nach. Ohne diesen Test waere die Sperre eine
+  // Sackgasse — jeder migrierte Auftraggeber bliebe dauerhaft nicht fakturierbar.
+  it('laesst nach dem Nachtragen der Adresse festschreiben — und verbraucht dabei genau eine Nummer', async () => {
+    const mig = (await upsertAuftraggeberAusMigration(getPool(), { nummer: '9002', name: 'Migrierte KB' })).auftraggeber;
+    const p = await createProjekt(getPool(), { stammnummer: 9002, jahr: 2026, name: 'Migriert 2', auftraggeberId: mig.id });
+    const r = await createRechnung(getPool(), { projektId: p.id, auftraggeberId: mig.id, datum: '2026-07-23' });
+    await addPosition(getPool(), r.id, { beschreibung: 'X', menge: 1, einzelpreis: 100, mwstSatz: 8.1 });
+
+    const vorher = await getZaehler(getPool(), 'rechnung_lfd_nr');
+    await expect(festschreiben(getPool(), r.id)).rejects.toBeInstanceOf(ValidationError);
+    expect(await getZaehler(getPool(), 'rechnung_lfd_nr')).toBe(vorher);
+
+    // Die Meldung nennt den Weg, der jetzt existiert.
+    await expect(festschreiben(getPool(), r.id)).rejects.toThrow(/PUT \/auftraggeber/);
+
+    await updateAuftraggeber(getPool(), mig.id, { strasse: 'Bahnhofstrasse 1', plz: '6460', ort: 'Altdorf' });
+
+    const f = await festschreiben(getPool(), r.id);
+    expect(f.status).toBe('abgerechnet');
+    expect(f.lfdNr).toBe(vorher + 1);
+    expect(await getZaehler(getPool(), 'rechnung_lfd_nr')).toBe(vorher + 1);
   });
 
   it('laesst Festschreibung fuer regulaer erfasste Auftraggeber unveraendert zu', async () => {

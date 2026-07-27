@@ -82,8 +82,9 @@ export async function festschreiben(pool: pg.Pool, rechnungId: string, ersteller
     if (auftraggeber.adresseUnvollstaendig) {
       throw new ValidationError(
         `Auftraggeber ${auftraggeber.nummer ?? auftraggeber.id} "${auftraggeber.name}" hat keine vollstaendige Adresse ` +
-        `(Strasse/PLZ/Ort fehlen aus der FileMaker-Migration). Die Adresse muss zuerst ergaenzt werden; ` +
-        `sonst verbraucht die Festschreibung eine unwiderrufliche Rechnungsnummer fuer einen nicht zustellbaren Beleg.`);
+        `(Strasse/PLZ/Ort fehlen aus der FileMaker-Migration). Adresse zuerst ergaenzen: ` +
+        `PUT /auftraggeber/${auftraggeber.id} mit strasse, plz und ort — danach ist die Festschreibung moeglich. ` +
+        `Sonst verbraucht sie eine unwiderrufliche Rechnungsnummer fuer einen nicht zustellbaren Beleg.`);
     }
 
     // Lueckenloser Zaehler: Sperre haelt bis commit/rollback -> bei Fehler keine Luecke

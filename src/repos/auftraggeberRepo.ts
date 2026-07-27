@@ -23,6 +23,58 @@ export async function createAuftraggeber(pool: pg.Pool, input: {
   return map(r.rows[0]);
 }
 
+export type AuftraggeberUpdate = {
+  name?: string; strasse?: string; plz?: string; ort?: string; land?: string;
+  zusatz?: string | null; ansprechperson?: string | null; email?: string | null; telefon?: string | null;
+};
+
+const UPDATE_SPALTE: Record<keyof AuftraggeberUpdate, string> = {
+  name: 'name', strasse: 'strasse', plz: 'plz', ort: 'ort', land: 'land',
+  zusatz: 'zusatz', ansprechperson: 'ansprechperson', email: 'email', telefon: 'telefon',
+};
+// Dieselbe Pflichtfeld-Regel wie in createAuftraggeber — hier auf die uebergebenen Felder
+// angewendet: wer ein Pflichtfeld mitschickt, muss es fuellen. Ein Leerwert wird
+// zurueckgewiesen statt geschrieben; sonst liesse sich eine vorhandene Adresse loeschen,
+// waehrend adresse_unvollstaendig auf false stehen bleibt.
+const UPDATE_PFLICHT = ['name', 'strasse', 'plz', 'ort', 'land'] as const;
+
+// Der einzige Weg, eine aus der Migration stammende Adresse nachzutragen (Befund B3).
+// adresse_unvollstaendig ist bewusst kein Eingabefeld, sondern wird aus den Daten
+// abgeleitet: erst wenn Strasse, PLZ und Ort alle gefuellt sind, faellt das Kennzeichen
+// auf false und die Festschreibung (rechnungRepo.festschreiben) gibt den Auftraggeber frei.
+// Anders herum wird es hier nie gesetzt — ein Leerwert kommt oben gar nicht durch.
+export async function updateAuftraggeber(pool: pg.Pool, id: string, input: AuftraggeberUpdate): Promise<Auftraggeber> {
+  const felder = (Object.keys(UPDATE_SPALTE) as Array<keyof AuftraggeberUpdate>)
+    .filter((f) => input[f] !== undefined);
+  if (felder.length === 0) throw new ValidationError('Kein aenderbares Feld uebergeben');
+  for (const f of felder) {
+    if ((UPDATE_PFLICHT as readonly string[]).includes(f) && !String(input[f] ?? '').trim()) {
+      throw new ValidationError(`Feld ${f} ist Pflicht`);
+    }
+  }
+
+  const args: any[] = [id];
+  const sets: string[] = [];
+  // Fuer die Ableitung des Kennzeichens zaehlt der Wert *nach* dem Update: fuer ein
+  // mitgeschicktes Feld also der Platzhalter, sonst die bisherige Spalte.
+  const nachher: Record<'strasse' | 'plz' | 'ort', string> = { strasse: 'strasse', plz: 'plz', ort: 'ort' };
+  for (const f of felder) {
+    args.push(input[f] ?? null);
+    const ph = `$${args.length}`;
+    sets.push(`${UPDATE_SPALTE[f]}=${ph}`);
+    if (f === 'strasse' || f === 'plz' || f === 'ort') nachher[f] = ph;
+  }
+  sets.push(
+    `adresse_unvollstaendig = case when btrim(${nachher.strasse}::text) <> ''
+                                   and btrim(${nachher.plz}::text) <> ''
+                                   and btrim(${nachher.ort}::text) <> ''
+                              then false else adresse_unvollstaendig end`);
+
+  const r = await pool.query(`update auftraggeber set ${sets.join(', ')} where id=$1 returning *`, args);
+  if (!r.rowCount) throw new NotFoundError(`Auftraggeber ${id} nicht gefunden`);
+  return map(r.rows[0]);
+}
+
 // Nimmt Pool oder Client: die Festschreibung muss den Auftraggeber innerhalb ihrer
 // eigenen Transaktion lesen (siehe rechnungRepo.festschreiben).
 export async function getAuftraggeberById(pool: pg.Pool | pg.PoolClient, id: string): Promise<Auftraggeber> {
