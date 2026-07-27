@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import type pg from 'pg';
 import { requireAdmin } from './auth';
+import { registerAuftraggeberRoutes } from './routes/auftraggeber';
+import { registerProjektRoutes } from './routes/projekt';
 
 export function buildApp(pool: pg.Pool): FastifyInstance {
   const app = Fastify({ logger: false });
@@ -11,6 +13,7 @@ export function buildApp(pool: pg.Pool): FastifyInstance {
     req.rolle = h === 'admin' ? 'admin' : 'standard';
   });
   app.get('/admin/ping', { preHandler: requireAdmin }, async () => ({ ok: true }));
-  // Routen (Task 8) werden hier registriert.
+  registerAuftraggeberRoutes(app, pool);
+  registerProjektRoutes(app, pool);
   return app;
 }

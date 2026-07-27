@@ -29,7 +29,7 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
 
 // CLI: `npm run migrate`
 if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
-  const { getPool, closePool } = await import('./pool.ts');
+  const { getPool, closePool } = await import('./pool');
   await runMigrations(getPool());
   await closePool();
   console.log('migrations applied');
