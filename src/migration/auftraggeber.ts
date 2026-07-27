@@ -18,23 +18,46 @@ export type AuftraggeberEintrag = { name: string; zusatz: string | null; ansprec
 export function sammleAuftraggeber(gruppen: ProjektGruppe[]): { gesehen: Map<string, AuftraggeberEintrag>; warnungen: string[] } {
   const warnungen: string[] = [];
   const gesehen = new Map<string, AuftraggeberEintrag>();
+  // Ansprechperson ist im Export eine Projekt-, keine Auftraggeber-Eigenschaft.
+  // Wir sammeln alle Auspraegungen je Nummer, um die Uebernahme der ersten als
+  // Stammdatum unten offenzulegen statt sie stillschweigend zu behaupten.
+  const ansprechpersonen = new Map<string, Set<string>>();
 
   for (const g of gruppen) {
     const projektNr = fmText(g.projekt['Projekt_Nr.']) ?? '(ohne Nr.)';
     const nummer = fmText(g.projekt['Auftraggeber_Nr.']);
     const roh = fmText(g.projekt['Auftraggeber']);
-    if (nummer === null || roh === null) {
-      warnungen.push(`Projekt ${projektNr}: ohne Auftraggeber-Nummer oder -Name uebersprungen`);
+    if (nummer === null) {
+      warnungen.push(`Projekt ${projektNr}: ohne Auftraggeber-Nr. — kein Auftraggeber uebernommen`);
+      continue;
+    }
+    if (roh === null) {
+      warnungen.push(`Projekt ${projektNr}: Auftraggeber-Nr. ${nummer} ohne Namen — kein Auftraggeber uebernommen`);
       continue;
     }
     const { name, zusatz } = fmName(roh);
+    const ansprechperson = fmText(g.projekt['Ansprechperson']);
+    if (ansprechperson !== null) {
+      if (!ansprechpersonen.has(nummer)) ansprechpersonen.set(nummer, new Set());
+      ansprechpersonen.get(nummer)!.add(ansprechperson);
+    }
     const vorhanden = gesehen.get(nummer);
     if (!vorhanden) {
-      gesehen.set(nummer, { name, zusatz, ansprechperson: fmText(g.projekt['Ansprechperson']) });
+      gesehen.set(nummer, { name, zusatz, ansprechperson });
     } else if (vorhanden.name !== name) {
       warnungen.push(`Auftraggeber-Nr. ${nummer}: abweichende Namen "${vorhanden.name}" / "${name}" — erster gewinnt`);
     }
   }
+
+  for (const [nummer, menge] of ansprechpersonen) {
+    if (menge.size <= 1) continue;
+    const uebernommen = gesehen.get(nummer)?.ansprechperson ?? null;
+    warnungen.push(
+      `Auftraggeber-Nr. ${nummer}: ${menge.size} verschiedene Ansprechpersonen im Export ` +
+      `(${[...menge].map((a) => `"${a}"`).join(', ')}) — als Stammdatum uebernommen: ` +
+      `${uebernommen === null ? 'keine' : `"${uebernommen}"`}; die projektbezogene Ansprechperson bleibt am Projekt erhalten`);
+  }
+
   return { gesehen, warnungen };
 }
 

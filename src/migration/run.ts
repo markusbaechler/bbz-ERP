@@ -3,12 +3,12 @@ import { pathToFileURL } from 'node:url';
 import type pg from 'pg';
 import { csvRecords } from './csv';
 import { gruppiereProjekte } from './gruppen';
-import { importStammdaten } from './stammdaten';
+import { importStammdaten, KONTENPLAN } from './stammdaten';
 import { importAuftraggeber, sammleAuftraggeber } from './auftraggeber';
-import { importProjekte, projektUebersprungenGrund } from './projekte';
+import { importProjekte, projektUebersprungenGrund, pruefeProjekt, kontoWarnung } from './projekte';
 import { vergleiche, formatReport, type ImportReport } from './report';
-import { fmProjektNummer, istProjektNummer, fmText, fmZahl } from './normalize';
-import { projektSummen } from '../repos/projektRepo';
+import { fmText } from './normalize';
+import { projektSummenFuerSchluessel, type ProjektSchluessel } from '../repos/projektRepo';
 import { setzeRechnungZaehler } from '../repos/zaehlerRepo';
 
 const ZAEHLER_HINWEIS =
@@ -16,26 +16,34 @@ const ZAEHLER_HINWEIS =
   'der Livebeleg vom Juli 2026 traegt bereits Nr. 33214. Den aktuellen Hoechststand in FileMaker ablesen ' +
   'und explizit uebergeben, sonst werden Rechnungsnummern doppelt vergeben.';
 
+const DRY_RUN_KONTEN_HINWEIS =
+  'Der Dry-Run prueft Konto/Aufw. Konto gegen den fest hinterlegten KONTENPLAN ' +
+  '(src/migration/stammdaten.ts), nicht gegen die Datenbank — er darf nichts lesen und nichts schreiben. ' +
+  'Konten, die nachtraeglich per REST erfasst wurden, sieht er darum nicht; der Apply-Lauf kann hier ' +
+  'weniger Kontierungs-Warnungen melden.';
+
+// Jahrgaenge eines Laufs, aufsteigend und ohne Dubletten.
+const jahrgaenge = (schluessel: ProjektSchluessel[]): number[] =>
+  [...new Set(schluessel.map((s) => s.jahr))].sort((a, b) => a - b);
+
 export async function fuehreMigrationAus(pool: pg.Pool, opts: {
   projekteCsv: string; modus: 'dry-run' | 'apply'; rechnungMax?: number;
 }): Promise<ImportReport> {
   const { records } = csvRecords(readFileSync(opts.projekteCsv, 'utf8'));
   const gruppen = gruppiereProjekte(records);
 
-  // Jahr aus der ersten *lesbaren* Projektnummer — der Export ist jahresweise (Befund B1).
-  // Eine krumme Nummer darf hier nicht werfen; sie wird weiter unten als uebersprungen gemeldet.
-  const ersteNr = gruppen.map((g) => fmText(g.projekt['Projekt_Nr.'])).find((n) => istProjektNummer(n));
-  const jahr = ersteNr === undefined ? null : fmProjektNummer(ersteNr!).jahr;
-
   if (opts.modus === 'dry-run') {
-    // Kein Schreibzugriff: nur zaehlen, was der Export enthaelt — mit denselben
-    // Ueberspring-Regeln (projektUebersprungenGrund) und derselben Zahlenauswertung
-    // (fmZahl) wie der Apply-Import, damit Dry-Run und Apply nie auseinanderlaufen.
+    // Kein Schreib- und kein Lesezugriff: nur zaehlen, was der Export enthaelt — mit
+    // denselben Ueberspring-Regeln (projektUebersprungenGrund) und denselben Pruefungen
+    // (pruefeProjekt) wie der Apply-Import, damit Dry-Run und Apply weder in den Zahlen
+    // noch im Warnungssatz auseinanderlaufen.
     const { gesehen: auftraggeberGesehen, warnungen: auftraggeberWarnungen } = sammleAuftraggeber(gruppen);
     const auftraggeberNummern = new Set(auftraggeberGesehen.keys());
+    const bekannteKonten = new Set<string>(KONTENPLAN.map((k) => k.nummer));
 
     let uebersprungen = 0;
     let budgetChf = 0, offenProv = 0, abgerechnet = 0;
+    const schluessel: ProjektSchluessel[] = [];
     const projektWarnungen: string[] = [];
     for (const g of gruppen) {
       const projektNr = fmText(g.projekt['Projekt_Nr.']) ?? '(ohne Nr.)';
@@ -45,16 +53,24 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
         projektWarnungen.push(`Projekt ${projektNr}: ${grund}`);
         continue;
       }
-      budgetChf += fmZahl(g.projekt['Budget CHF']) ?? 0;
-      offenProv += fmZahl(g.projekt['offen_prov.']) ?? 0;
-      abgerechnet += fmZahl(g.projekt['abgerechnet']) ?? 0;
+      const pruefung = pruefeProjekt(g);
+      projektWarnungen.push(...pruefung.warnungen);
+      for (const feld of ['Konto', 'Aufw. Konto'] as const) {
+        const nummer = fmText(g.projekt[feld]);
+        if (nummer !== null && !bekannteKonten.has(nummer)) projektWarnungen.push(kontoWarnung(projektNr, feld, nummer));
+      }
+      schluessel.push({ stammnummer: pruefung.stammnummer, jahr: pruefung.jahr });
+      budgetChf += pruefung.zahlen.budgetChf ?? 0;
+      offenProv += pruefung.zahlen.offenProv ?? 0;
+      abgerechnet += pruefung.zahlen.abgerechnet ?? 0;
     }
     budgetChf = Math.round(budgetChf * 100) / 100;
     offenProv = Math.round(offenProv * 100) / 100;
     abgerechnet = Math.round(abgerechnet * 100) / 100;
+    const jahre = jahrgaenge(schluessel);
 
     return {
-      quelle: opts.projekteCsv, modus: 'dry-run', jahr,
+      quelle: opts.projekteCsv, modus: 'dry-run', jahr: jahre.length === 1 ? jahre[0] : null, jahre,
       auftraggeber: { gelesen: auftraggeberNummern.size, neu: 0, aktualisiert: 0, ohneAdresse: auftraggeberNummern.size },
       projekte: { gelesen: gruppen.length, neu: 0, aktualisiert: 0, uebersprungen },
       konten: { angelegt: 0, vorhanden: 0 },
@@ -66,13 +82,18 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
         abgerechnet: vergleiche(abgerechnet, null),
       },
       warnungen: [...auftraggeberWarnungen, ...projektWarnungen],
+      hinweise: [DRY_RUN_KONTEN_HINWEIS],
     };
   }
 
   const stamm = await importStammdaten(pool);
   const ag = await importAuftraggeber(pool, gruppen);
   const pr = await importProjekte(pool, gruppen, ag.idNachNummer);
-  const db = jahr === null ? null : await projektSummen(pool, jahr);
+  // Abgleich ausschliesslich ueber die Projekte, die dieser Lauf geschrieben hat —
+  // nicht ueber "alle Projekte des Jahres": das schloss fremde Datensaetze ein und
+  // liess bei mehrjaehrigen Dateien alle uebrigen Jahrgaenge weg.
+  const db = await projektSummenFuerSchluessel(pool, pr.schluessel);
+  const jahre = jahrgaenge(pr.schluessel);
 
   let gesetztAuf: number | null = null;
   let hinweis: string | null = ZAEHLER_HINWEIS;
@@ -82,17 +103,18 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
   }
 
   return {
-    quelle: opts.projekteCsv, modus: 'apply', jahr,
+    quelle: opts.projekteCsv, modus: 'apply', jahr: jahre.length === 1 ? jahre[0] : null, jahre,
     auftraggeber: { gelesen: ag.gelesen, neu: ag.neu, aktualisiert: ag.aktualisiert, ohneAdresse: ag.ohneAdresse },
     projekte: { gelesen: pr.gelesen, neu: pr.neu, aktualisiert: pr.aktualisiert, uebersprungen: pr.uebersprungen },
     konten: stamm.konten, mwstSaetze: stamm.mwstSaetze,
     zaehler: { gesetztAuf, hinweis },
     summen: {
-      budgetChf: vergleiche(pr.csvSummen.budgetChf, db?.budgetChf ?? null),
-      offenProv: vergleiche(pr.csvSummen.offenProv, db?.offenProv ?? null),
-      abgerechnet: vergleiche(pr.csvSummen.abgerechnet, db?.abgerechnet ?? null),
+      budgetChf: vergleiche(pr.csvSummen.budgetChf, db.budgetChf, db.anzahl),
+      offenProv: vergleiche(pr.csvSummen.offenProv, db.offenProv, db.anzahl),
+      abgerechnet: vergleiche(pr.csvSummen.abgerechnet, db.abgerechnet, db.anzahl),
     },
     warnungen: [...ag.warnungen, ...pr.warnungen],
+    hinweise: [],
   };
 }
 

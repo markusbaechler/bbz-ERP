@@ -76,6 +76,27 @@ export async function upsertProjektAusMigration(pool: pg.Pool, input: MigrationP
   return { projekt: map(r.rows[0]), neu: r.rows[0].neu };
 }
 
+export type ProjektSchluessel = { stammnummer: number; jahr: number };
+export type ProjektSummen = { anzahl: number; budgetChf: number; offenProv: number; abgerechnet: number };
+
+// Summen ueber genau die uebergebenen Projekte. Der Migrations-Abgleich darf weder
+// Projekte mitzaehlen, die nicht aus diesem Export stammen (z.B. per REST erfasste),
+// noch Jahrgaenge auslassen, wenn eine Datei mehrere enthaelt.
+export async function projektSummenFuerSchluessel(pool: pg.Pool, schluessel: ProjektSchluessel[]): Promise<ProjektSummen> {
+  if (schluessel.length === 0) return { anzahl: 0, budgetChf: 0, offenProv: 0, abgerechnet: 0 };
+  const r = await pool.query(
+    `select count(*)::int as anzahl,
+            coalesce(sum(p.budget_chf),0)::numeric      as budget_chf,
+            coalesce(sum(p.fm_offen_prov),0)::numeric   as offen_prov,
+            coalesce(sum(p.fm_abgerechnet),0)::numeric  as abgerechnet
+     from projekt p
+     join unnest($1::int[], $2::int[]) as k(stammnummer, jahr)
+       on p.stammnummer = k.stammnummer and p.jahr = k.jahr`,
+    [schluessel.map((s) => s.stammnummer), schluessel.map((s) => s.jahr)]);
+  const row = r.rows[0];
+  return { anzahl: row.anzahl, budgetChf: Number(row.budget_chf), offenProv: Number(row.offen_prov), abgerechnet: Number(row.abgerechnet) };
+}
+
 export async function projektSummen(pool: pg.Pool, jahr: number): Promise<{ anzahl: number; budgetChf: number; offenProv: number; abgerechnet: number }> {
   const r = await pool.query(
     `select count(*)::int as anzahl,

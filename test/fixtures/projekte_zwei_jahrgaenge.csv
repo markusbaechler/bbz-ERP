@@ -1,0 +1,5 @@
+Projekt_Nr.;Jahr;Projekt_Name;Projekt_Kürzel;Bereich;Beschrieb;Auftraggeber;Auftraggeber_Nr.;Ansprechperson;Konto;Aufw. Konto;Budget CHF;Budget Tage;Aufw. Budget CHF;offen_prov.;abgerechnet;alte_Projekt_Nr;Referent intern;MWSt;Erstellt durch;geändert durch;Faktura::Erfassungsdatum;Faktura::Total_Summe Übersicht
+8001.25;2025;Vorjahr eins;;;;Firma E;801;;3010;;100;;;10;20;;;;;;;
+8002.25;2025;Vorjahr zwei;;;;Firma F;802;;3010;;200;;;20;30;;;;;;;
+8003.26;2026;Laufjahr eins;;;;Firma E;801;;3010;;300;;;30;40;;;;;;;
+8004.26;2026;Laufjahr zwei;;;;Firma F;802;;3010;;400;;;40;50;;;;;;;

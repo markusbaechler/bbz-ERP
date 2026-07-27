@@ -3,7 +3,10 @@ export type SummenVergleich = { csv: number; db: number | null; differenz: numbe
 export type ImportReport = {
   quelle: string;
   modus: 'dry-run' | 'apply';
+  /** Gesetzt, wenn der Lauf genau einen Jahrgang betrifft — sonst null. */
   jahr: number | null;
+  /** Alle Jahrgaenge, die dieser Lauf uebernommen hat, aufsteigend. */
+  jahre: number[];
   auftraggeber: { gelesen: number; neu: number; aktualisiert: number; ohneAdresse: number };
   projekte: { gelesen: number; neu: number; aktualisiert: number; uebersprungen: number };
   konten: { angelegt: number; vorhanden: number };
@@ -11,16 +14,34 @@ export type ImportReport = {
   zaehler: { gesetztAuf: number | null; hinweis: string | null };
   summen: { budgetChf: SummenVergleich; offenProv: SummenVergleich; abgerechnet: SummenVergleich };
   warnungen: string[];
+  /** Erlaeuterungen zum Lauf selbst (z.B. was der Dry-Run nicht pruefen kann). */
+  hinweise: string[];
 };
 
-export function vergleiche(csv: number, db: number | null): SummenVergleich {
+// Toleranz des Summenabgleichs, `anzahl` = Zahl der summierten Projekte.
+// Regel: jeder Betrag liegt als numeric(12,2) in der DB. Ein CSV-Wert mit mehr als
+// zwei Nachkommastellen wird beim Schreiben je Projekt um bis zu einen halben Rappen
+// gerundet, ueber n Projekte also um bis zu n * 0.005. Dazu kommt ein Rappen fuer die
+// Rundung der Gesamtsumme selbst. Eine feste Toleranz von 0.01 wuerde beim
+// angekuendigten Vollexport (~4967 Projekte) einen korrekten Lauf als ABWEICHUNG
+// melden; ohne den n-Anteil waere die Regel nicht skalierbar.
+export function vergleiche(csv: number, db: number | null, anzahl = 0): SummenVergleich {
   if (db === null) return { csv, db: null, differenz: null, ok: true };
   const differenz = Math.round((db - csv) * 100) / 100;
-  return { csv, db, differenz, ok: Math.abs(differenz) <= 0.01 };
+  const toleranz = 0.01 + anzahl * 0.005;
+  return { csv, db, differenz, ok: Math.abs(differenz) <= toleranz };
 }
 
 const chf = (n: number | null): string =>
   n === null ? '—' : n.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Ein Jahrgang -> "Jahr: 2026"; mehrere -> Spanne, damit nie ein einzelnes Jahr
+// behauptet wird, das bloss aus der ersten Zeile stammt.
+const jahrgangText = (jahre: number[]): string => {
+  if (jahre.length === 0) return '';
+  if (jahre.length === 1) return ` · **Jahr:** ${jahre[0]}`;
+  return ` · **Jahrgaenge:** ${jahre[0]}–${jahre[jahre.length - 1]} (${jahre.length})`;
+};
 
 export function formatReport(r: ImportReport): string {
   const zeile = (name: string, v: SummenVergleich) =>
@@ -28,7 +49,7 @@ export function formatReport(r: ImportReport): string {
   return [
     `# Migrations-Report`,
     ``,
-    `**Quelle:** \`${r.quelle}\` · **Modus:** ${r.modus}${r.jahr === null ? '' : ` · **Jahr:** ${r.jahr}`}`,
+    `**Quelle:** \`${r.quelle}\` · **Modus:** ${r.modus}${jahrgangText(r.jahre)}`,
     ``,
     `## Uebernommene Datensaetze`,
     ``,
@@ -57,5 +78,6 @@ export function formatReport(r: ImportReport): string {
     ``,
     ...(r.warnungen.length === 0 ? ['Keine.'] : r.warnungen.map((w) => `- ${w}`)),
     ``,
+    ...(r.hinweise.length === 0 ? [] : [`## Hinweise zum Lauf`, ``, ...r.hinweise.map((h) => `- ${h}`), ``]),
   ].join('\n');
 }

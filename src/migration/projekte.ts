@@ -3,13 +3,83 @@ import type { ProjektGruppe } from './gruppen';
 import type { MigrationProjektInput } from '../domain/types';
 import { fmText, fmZahl, fmProjektNummer, istProjektNummer, fmBereich } from './normalize';
 import { findKontoByNummer } from '../repos/kontoRepo';
-import { upsertProjektAusMigration } from '../repos/projektRepo';
+import { upsertProjektAusMigration, type ProjektSchluessel } from '../repos/projektRepo';
 
 export type ProjektImportErgebnis = {
   gelesen: number; neu: number; aktualisiert: number; uebersprungen: number;
   csvSummen: { budgetChf: number; offenProv: number; abgerechnet: number };
+  /** (stammnummer, jahr) genau der Projekte, die dieser Lauf geschrieben hat. */
+  schluessel: ProjektSchluessel[];
   warnungen: string[];
 };
+
+// Die drei Beträge des Summenabgleichs plus die beiden weiteren Zahlfelder.
+export type ProjektZahlen = {
+  budgetChf: number | null; offenProv: number | null; abgerechnet: number | null;
+  budgetTage: number | null; aufwandBudgetChf: number | null;
+};
+
+export type ProjektPruefung = {
+  stammnummer: number; jahr: number;
+  zahlen: ProjektZahlen;
+  mwstModus: 'exkl' | 'inkl';
+  warnungen: string[];
+};
+
+// Einheitlicher Text, damit Dry-Run (gegen KONTENPLAN) und Apply (gegen die DB)
+// dieselbe Warnung erzeugen.
+export const kontoWarnung = (projektNr: string, feld: string, nummer: string): string =>
+  `Projekt ${projektNr}: ${feld} "${nummer}" nicht im Kontenplan — Kontierung bleibt offen`;
+
+// Alle Pruefungen eines importierbaren Projekts, die ohne Datenbank auskommen.
+// Apply-Import und Dry-Run-Vorschau rufen dieselbe Funktion, damit beide Modi
+// denselben Warnungssatz erzeugen (nur die Kontenpruefung hat je Modus eine
+// andere Quelle und wird darum vom Aufrufer ergaenzt).
+// Voraussetzung: projektUebersprungenGrund hat null geliefert.
+export function pruefeProjekt(g: ProjektGruppe): ProjektPruefung {
+  const p = g.projekt;
+  const projektNr = fmText(p['Projekt_Nr.'])!;
+  const warnungen: string[] = [];
+  const { stammnummer, jahr } = fmProjektNummer(projektNr);
+
+  const jahrSpalte = fmZahl(p['Jahr']);
+  if (jahrSpalte !== null && jahrSpalte !== jahr) {
+    warnungen.push(`Projekt ${projektNr}: Spalte Jahr=${jahrSpalte} weicht von der Nummer ab — ${jahr} verwendet`);
+  }
+
+  // Ein nicht lesbarer Betrag wird null und faellt damit auf beiden Seiten des
+  // Abgleichs als 0 weg — der Abgleich meldet "ok", das Geld ist trotzdem weg.
+  // Darum hier melden, mit Feldname und Rohwert.
+  const zahl = (feld: string): number | null => {
+    const roh = fmText(p[feld]);
+    const n = fmZahl(p[feld]);
+    if (roh !== null && n === null) {
+      warnungen.push(`Projekt ${projektNr}: ${feld} "${roh}" ist keine lesbare Zahl — Wert bleibt leer und fehlt im Summenabgleich`);
+    }
+    return n;
+  };
+  const zahlen: ProjektZahlen = {
+    budgetChf: zahl('Budget CHF'),
+    offenProv: zahl('offen_prov.'),
+    abgerechnet: zahl('abgerechnet'),
+    budgetTage: zahl('Budget Tage'),
+    aufwandBudgetChf: zahl('Aufw. Budget CHF'),
+  };
+
+  // mwst_modus entscheidet, ob ein Budget brutto oder netto gemeint ist. Leer ->
+  // exkl (Schema-Default, korrekt); ein nicht erkannter Wert wird gemeldet.
+  const mwstRoh = fmText(p['MWSt']);
+  let mwstModus: 'exkl' | 'inkl' = 'exkl';
+  if (mwstRoh !== null) {
+    const t = mwstRoh.toLowerCase();
+    if (t.startsWith('inkl')) mwstModus = 'inkl';
+    else if (!t.startsWith('exkl')) {
+      warnungen.push(`Projekt ${projektNr}: MWSt "${mwstRoh}" nicht erkannt — exkl. angenommen, Budget als Nettobetrag gewertet`);
+    }
+  }
+
+  return { stammnummer, jahr, zahlen, mwstModus, warnungen };
+}
 
 // Reine CSV-Entscheidung, ob ein Projekt uebersprungen wuerde — ohne DB-Zugriff.
 // `auftraggeberNummern` ist die Menge der Auftraggeber-Nummern, die ueberhaupt importierbar
@@ -40,7 +110,7 @@ export async function importProjekte(
 ): Promise<ProjektImportErgebnis> {
   const e: ProjektImportErgebnis = {
     gelesen: gruppen.length, neu: 0, aktualisiert: 0, uebersprungen: 0,
-    csvSummen: { budgetChf: 0, offenProv: 0, abgerechnet: 0 }, warnungen: [],
+    csvSummen: { budgetChf: 0, offenProv: 0, abgerechnet: 0 }, schluessel: [], warnungen: [],
   };
   const auftraggeberNummern = new Set(idNachNummer.keys());
   // Kontonummer -> id (oder null fuer "nicht im Kontenplan"), einmal je Lauf aufgeloest
@@ -52,7 +122,7 @@ export async function importProjekte(
       kontoCache.set(nummer, k?.id ?? null);
     }
     const id = kontoCache.get(nummer)!;
-    if (id === null) e.warnungen.push(`Projekt ${projektNr}: ${feld} "${nummer}" nicht im Kontenplan — Kontierung bleibt offen`);
+    if (id === null) e.warnungen.push(kontoWarnung(projektNr, feld, nummer));
     return id;
   };
 
@@ -67,15 +137,9 @@ export async function importProjekte(
     const auftraggeberNr = fmText(p['Auftraggeber_Nr.'])!;
     const auftraggeberId = idNachNummer.get(auftraggeberNr)!;
 
-    const { stammnummer, jahr } = fmProjektNummer(projektNr);
-    const jahrSpalte = fmZahl(p['Jahr']);
-    if (jahrSpalte !== null && jahrSpalte !== jahr) {
-      e.warnungen.push(`Projekt ${projektNr}: Spalte Jahr=${jahrSpalte} weicht von der Nummer ab — ${jahr} verwendet`);
-    }
-
-    const budgetChf = fmZahl(p['Budget CHF']);
-    const offenProv = fmZahl(p['offen_prov.']);
-    const abgerechnet = fmZahl(p['abgerechnet']);
+    const { stammnummer, jahr, zahlen, mwstModus, warnungen } = pruefeProjekt(g);
+    e.warnungen.push(...warnungen);
+    const { budgetChf, offenProv, abgerechnet } = zahlen;
 
     const input: MigrationProjektInput = {
       stammnummer, jahr, name, auftraggeberId,
@@ -85,18 +149,19 @@ export async function importProjekte(
       ansprechperson: fmText(p['Ansprechperson']),
       ertragskontoId: await kontoId(fmText(p['Konto']), projektNr, 'Konto'),
       aufwandKontoId: await kontoId(fmText(p['Aufw. Konto']), projektNr, 'Aufw. Konto'),
-      budgetChf, budgetTage: fmZahl(p['Budget Tage']),
-      aufwandBudgetChf: fmZahl(p['Aufw. Budget CHF']),
+      budgetChf, budgetTage: zahlen.budgetTage,
+      aufwandBudgetChf: zahlen.aufwandBudgetChf,
       fmOffenProv: offenProv, fmAbgerechnet: abgerechnet,
       alteProjektNr: fmText(p['alte_Projekt_Nr']),
       projektleitungKuerzel: fmText(p['Referent intern']),
-      mwstModus: (fmText(p['MWSt']) ?? '').toLowerCase().startsWith('inkl') ? 'inkl' : 'exkl',
+      mwstModus,
       erstelltDurch: fmText(p['Erstellt durch']),
       geaendertDurch: fmText(p['geändert durch']),
     };
 
     const r = await upsertProjektAusMigration(pool, input);
     r.neu ? e.neu++ : e.aktualisiert++;
+    e.schluessel.push({ stammnummer, jahr });
     e.csvSummen.budgetChf += budgetChf ?? 0;
     e.csvSummen.offenProv += offenProv ?? 0;
     e.csvSummen.abgerechnet += abgerechnet ?? 0;
