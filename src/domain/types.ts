@@ -30,3 +30,13 @@ export type Rechnung = {
   lfdNr: number | null; nummer: string | null; status: RechnungStatus;
   totalNetto: number; totalMwst: number; totalBrutto: number;
 };
+
+export type Zahlungseingang = {
+  id: string; rechnungId: string; datum: string; betrag: number;
+  bemerkung: string | null; erfasstDurch: string | null;
+};
+
+export type OffenerPosten = {
+  rechnungId: string; nummer: string | null; auftraggeberId: string; datum: string;
+  totalBrutto: number; bezahlt: number; offen: number;
+};
