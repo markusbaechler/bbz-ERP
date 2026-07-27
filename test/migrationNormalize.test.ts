@@ -21,6 +21,7 @@ describe('fmZahl', () => {
     expect(fmZahl("1'234.50")).toBe(1234.5);
     expect(fmZahl('1’234.50’')).toBe(1234.5);
     expect(fmZahl('1234,50')).toBe(1234.5);
+    expect(fmZahl('1 234.50')).toBe(1234.5);
   });
   it('gibt null fuer Leeres und Nicht-Zahlen', () => {
     expect(fmZahl('')).toBeNull();

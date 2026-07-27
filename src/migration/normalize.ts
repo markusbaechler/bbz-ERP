@@ -8,7 +8,7 @@ export function fmText(v: string | undefined): string | null {
 export function fmZahl(v: string | undefined): number | null {
   let t = (v ?? '').trim();
   if (t === '') return null;
-  t = t.replace(/['’s]/g, '');
+  t = t.replace(/['’\s]/g, '');
   if (!t.includes('.') && t.includes(',')) t = t.replace(',', '.');
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
