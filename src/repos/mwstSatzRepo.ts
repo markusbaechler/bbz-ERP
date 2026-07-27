@@ -24,3 +24,12 @@ export async function findGueltigenSatz(pool: pg.Pool, satz: number, datum: stri
   if (!r.rowCount) throw new NotFoundError(`Kein MWSt-Satz ${satz} gültig am ${datum}`);
   return map(r.rows[0]);
 }
+
+export async function upsertMwstSatz(pool: pg.Pool, input: { satz: number; bezeichnung: string; gueltigAb: string; gueltigBis?: string | null }): Promise<{ mwstSatz: MwstSatz; neu: boolean }> {
+  const r = await pool.query(
+    `insert into mwst_satz(satz,bezeichnung,gueltig_ab,gueltig_bis) values ($1,$2,$3,$4)
+     on conflict (satz, gueltig_ab) do update set bezeichnung=excluded.bezeichnung, gueltig_bis=excluded.gueltig_bis
+     returning *, (xmax = 0) as neu`,
+    [input.satz, input.bezeichnung, input.gueltigAb, input.gueltigBis ?? null]);
+  return { mwstSatz: map(r.rows[0]), neu: r.rows[0].neu };
+}
