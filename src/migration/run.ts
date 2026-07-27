@@ -104,7 +104,7 @@ export async function fuehreMigrationAus(pool: pg.Pool, opts: {
   let gesetztAuf: number | null = null;
   let hinweis: string | null = ZAEHLER_HINWEIS;
   if (opts.rechnungMax !== undefined) {
-    gesetztAuf = await setzeRechnungZaehler(pool, opts.rechnungMax);
+    gesetztAuf = await setzeRechnungZaehler(pool, opts.rechnungMax, 'CLI migrate:fm --rechnung-max');
     hinweis = null;
   }
 
