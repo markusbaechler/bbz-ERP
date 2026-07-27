@@ -11,6 +11,22 @@ export type ProjektImportErgebnis = {
   warnungen: string[];
 };
 
+// Reine CSV-Entscheidung, ob ein Projekt uebersprungen wuerde — ohne DB-Zugriff.
+// `auftraggeberNummern` ist die Menge der Auftraggeber-Nummern, die ueberhaupt importierbar
+// sind (siehe sammleAuftraggeber in auftraggeber.ts). Diese Funktion ist die einzige Stelle,
+// die "uebersprungen" definiert; sowohl der Apply-Import (unten) als auch die Dry-Run-Vorschau
+// (run.ts) rufen sie auf, damit beide Modi zwingend dasselbe Ergebnis liefern.
+export function projektUebersprungenGrund(g: ProjektGruppe, auftraggeberNummern: Set<string>): string | null {
+  const p = g.projekt;
+  const name = fmText(p['Projekt_Name']);
+  const auftraggeberNr = fmText(p['Auftraggeber_Nr.']);
+  if (name === null) return 'ohne Projekt_Name uebersprungen';
+  if (auftraggeberNr === null || !auftraggeberNummern.has(auftraggeberNr)) {
+    return `Auftraggeber-Nr. "${auftraggeberNr}" nicht importiert — uebersprungen`;
+  }
+  return null;
+}
+
 export async function importProjekte(
   pool: pg.Pool,
   gruppen: ProjektGruppe[],
@@ -20,6 +36,7 @@ export async function importProjekte(
     gelesen: gruppen.length, neu: 0, aktualisiert: 0, uebersprungen: 0,
     csvSummen: { budgetChf: 0, offenProv: 0, abgerechnet: 0 }, warnungen: [],
   };
+  const auftraggeberNummern = new Set(idNachNummer.keys());
   // Kontonummer -> id (oder null fuer "nicht im Kontenplan"), einmal je Lauf aufgeloest
   const kontoCache = new Map<string, string | null>();
   const kontoId = async (nummer: string | null, projektNr: string, feld: string): Promise<string | null> => {
@@ -36,12 +53,13 @@ export async function importProjekte(
   for (const g of gruppen) {
     const p = g.projekt;
     const projektNr = fmText(p['Projekt_Nr.']) ?? '(ohne Nr.)';
-    const name = fmText(p['Projekt_Name']);
-    const auftraggeberNr = fmText(p['Auftraggeber_Nr.']);
-    const auftraggeberId = auftraggeberNr === null ? undefined : idNachNummer.get(auftraggeberNr);
 
-    if (name === null) { e.uebersprungen++; e.warnungen.push(`Projekt ${projektNr}: ohne Projekt_Name uebersprungen`); continue; }
-    if (!auftraggeberId) { e.uebersprungen++; e.warnungen.push(`Projekt ${projektNr}: Auftraggeber-Nr. "${auftraggeberNr}" nicht importiert — uebersprungen`); continue; }
+    const grund = projektUebersprungenGrund(g, auftraggeberNummern);
+    if (grund !== null) { e.uebersprungen++; e.warnungen.push(`Projekt ${projektNr}: ${grund}`); continue; }
+
+    const name = fmText(p['Projekt_Name'])!;
+    const auftraggeberNr = fmText(p['Auftraggeber_Nr.'])!;
+    const auftraggeberId = idNachNummer.get(auftraggeberNr)!;
 
     const { stammnummer, jahr } = fmProjektNummer(projektNr);
     const jahrSpalte = fmZahl(p['Jahr']);

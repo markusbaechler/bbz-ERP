@@ -9,11 +9,15 @@ export type AuftraggeberImportErgebnis = {
   warnungen: string[];
 };
 
-// Der Projekt-Export nennt Auftraggeber nur mit Nummer und Namen — keine Adresse (Befund B3).
-// Deshalb wird hier bewusst ohne Adresse importiert und der Datensatz markiert.
-export async function importAuftraggeber(pool: pg.Pool, gruppen: ProjektGruppe[]): Promise<AuftraggeberImportErgebnis> {
+export type AuftraggeberEintrag = { name: string; zusatz: string | null; ansprechperson: string | null };
+
+// Reine CSV-Auswertung, ohne DB-Zugriff: welche Auftraggeber-Nummern haben ueberhaupt
+// einen Namen und sind damit importierbar? Wird sowohl vom Apply-Import (unten) als auch
+// von der Dry-Run-Vorschau (run.ts) verwendet, damit beide Modi dieselbe Definition von
+// "importierbarer Auftraggeber" haben und nicht auseinanderlaufen koennen.
+export function sammleAuftraggeber(gruppen: ProjektGruppe[]): { gesehen: Map<string, AuftraggeberEintrag>; warnungen: string[] } {
   const warnungen: string[] = [];
-  const gesehen = new Map<string, { name: string; zusatz: string | null; ansprechperson: string | null }>();
+  const gesehen = new Map<string, AuftraggeberEintrag>();
 
   for (const g of gruppen) {
     const projektNr = fmText(g.projekt['Projekt_Nr.']) ?? '(ohne Nr.)';
@@ -31,6 +35,13 @@ export async function importAuftraggeber(pool: pg.Pool, gruppen: ProjektGruppe[]
       warnungen.push(`Auftraggeber-Nr. ${nummer}: abweichende Namen "${vorhanden.name}" / "${name}" — erster gewinnt`);
     }
   }
+  return { gesehen, warnungen };
+}
+
+// Der Projekt-Export nennt Auftraggeber nur mit Nummer und Namen — keine Adresse (Befund B3).
+// Deshalb wird hier bewusst ohne Adresse importiert und der Datensatz markiert.
+export async function importAuftraggeber(pool: pg.Pool, gruppen: ProjektGruppe[]): Promise<AuftraggeberImportErgebnis> {
+  const { gesehen, warnungen } = sammleAuftraggeber(gruppen);
 
   const ergebnis: AuftraggeberImportErgebnis = {
     gelesen: gesehen.size, neu: 0, aktualisiert: 0, ohneAdresse: 0,

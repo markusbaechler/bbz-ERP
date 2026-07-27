@@ -1,0 +1,5 @@
+Projekt_Nr.;Jahr;Projekt_Name;Projekt_Kürzel;Bereich;Beschrieb;Auftraggeber;Auftraggeber_Nr.;Ansprechperson;Konto;Aufw. Konto;Budget CHF;Budget Tage;Aufw. Budget CHF;offen_prov.;abgerechnet;alte_Projekt_Nr;Referent intern;MWSt;Erstellt durch;geändert durch;Faktura::Erfassungsdatum;Faktura::Total_Summe Übersicht
+1001.26;2026;Normal Projekt;;;;Firma A;501;;;;1000;;;200;300;;;;;;;
+1002.26;2026;;;;;Firma B;502;;;;5000;;;;;;;;;;;
+1003.26;2026;Verwaist;;;;;503;;;;9999;;;;;;;;;;;
+1004.26;2026;Komma Test;;;;Firma D;504;;;;1234,56;;;0;0;;;;;;;
