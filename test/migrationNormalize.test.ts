@@ -19,7 +19,7 @@ describe('fmZahl', () => {
   });
   it('entfernt Tausendertrenner und akzeptiert Komma-Dezimal', () => {
     expect(fmZahl("1'234.50")).toBe(1234.5);
-    expect(fmZahl("1'234.50'")).toBe(1234.5);
+    expect(fmZahl('1’234.50’')).toBe(1234.5);
     expect(fmZahl('1234,50')).toBe(1234.5);
   });
   it('gibt null fuer Leeres und Nicht-Zahlen', () => {
