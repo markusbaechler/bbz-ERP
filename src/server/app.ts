@@ -3,6 +3,7 @@ import type pg from 'pg';
 import { requireAdmin } from './auth';
 import { registerAuftraggeberRoutes } from './routes/auftraggeber';
 import { registerProjektRoutes } from './routes/projekt';
+import { registerRechnungRoutes } from './routes/rechnung';
 
 export function buildApp(pool: pg.Pool): FastifyInstance {
   const app = Fastify({ logger: false });
@@ -15,5 +16,6 @@ export function buildApp(pool: pg.Pool): FastifyInstance {
   app.get('/admin/ping', { preHandler: requireAdmin }, async () => ({ ok: true }));
   registerAuftraggeberRoutes(app, pool);
   registerProjektRoutes(app, pool);
+  registerRechnungRoutes(app, pool);
   return app;
 }
