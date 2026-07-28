@@ -73,4 +73,12 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 #fehlerbanner { background: #FBEAEA; color: var(--storno); border-bottom: 1px solid var(--storno); }
 #sperrstreifen { background: #FBF3E3; color: var(--offen); border-bottom: 1px solid var(--offen); }
 .hinweis-fm { font-size: .78rem; color: var(--tinte-matt); }
+
+.kopfdaten dl { display: grid; grid-template-columns: 11rem 1fr; gap: .15rem 1rem; margin: 0 0 1rem; }
+.kopfdaten dt { color: var(--tinte-matt); font-size: .85rem; }
+.kopfdaten dd { margin: 0; }
+.beschrieb { font: inherit; white-space: pre-wrap; background: #fff; border-left: 2px solid var(--linie); padding: .5rem .8rem; margin: 0 0 1rem; }
+.sperrhinweis { background: #FBF3E3; border: 1px solid var(--offen); padding: .7rem; }
+.sperrhinweis label { margin-right: .8rem; }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
