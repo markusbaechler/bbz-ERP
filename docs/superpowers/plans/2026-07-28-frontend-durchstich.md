@@ -18,7 +18,7 @@ Spec: `docs/superpowers/specs/2026-07-28-frontend-durchstich-design.md`
 - **Kein Build-Schritt.** `public/` wird unverändert ausgeliefert. Dateien dort sind `.js`, nicht TypeScript, und liegen ausserhalb von `tsconfig.json` — `npx tsc --noEmit` deckt sie nicht ab. Ihre Absicherung sind die Unit-Tests aus Task 3.
 - **Beträge:** Rappenrundung auf 0.05 über `rappenRunden`. Die Browser-Rechnung muss dieselben Werte liefern wie `src/domain/mwst.ts` — Task 3 prüft das.
 - **Schweizer Formate:** `4'435'265.00`, `27.07.2026`, `8.1 %`.
-- **Rot ist reserviert** für Storno und negative Beträge. Es ist keine allgemeine Warnfarbe.
+- **Rot (`--storno`) ist reserviert** für Storno, negative Beträge und echte Fehlerzustände. Es ist **keine Warnfarbe**: blockierende Vorbedingungen (gesperrter Zähler, fehlende Adresse) tragen Ocker (`--offen`), weil sie kein Fehler des Benutzers sind, sondern ein Zustand des Systems.
 - **Rollen-Header:** `x-user-role: admin` wird an **genau einer Stelle** gesetzt (`public/api.js`), mit Kommentar, dass Entra-ID das ablöst.
 - Deutsch in Code, Kommentaren und Oberfläche, **„ss" statt „ß"**. Commit-Trailer: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
 - Barrierefreiheit als Untergrenze, ohne Aufhebens: sichtbarer Tastaturfokus, Beschriftungen an allen Feldern, `prefers-reduced-motion` respektiert.
