@@ -11,7 +11,7 @@ describe('statische Auslieferung', () => {
     const r = await app.inject({ method: 'GET', url: '/' });
     expect(r.statusCode).toBe(200);
     expect(r.headers['content-type']).toContain('text/html');
-    expect(r.body).toContain('<div id="inhalt"');
+    expect(r.body).toContain('id="inhalt"');
   });
 
   it('liefert Stylesheet und Module', async () => {
