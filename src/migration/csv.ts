@@ -1,3 +1,5 @@
+import { ValidationError } from '../domain/errors';
+
 // Minimaler RFC4180-Parser fuer die FileMaker-Exporte: ';'-getrennt, UTF-8 mit BOM,
 // Zeilenumbrueche innerhalb gequoteter Felder (mehrzeilige Beschrieb-/Adressfelder).
 export function parseCsv(text: string, sep = ';'): string[][] {
@@ -22,11 +24,39 @@ export function parseCsv(text: string, sep = ';'): string[][] {
   return rows;
 }
 
-export function csvRecords(text: string, sep = ';'): { header: string[]; records: Array<Record<string, string>> } {
+export type CsvOptionen = {
+  /**
+   * Erste Spaltenueberschrift, an der die Kopfzeile erkannt wird. Ohne diese Angabe
+   * gilt Zeile 1 als Kopf (so liefern die FileMaker-Exporte).
+   *
+   * Der Kontenplan kommt dagegen aus einem Excel-Blatt, dessen Kopf ueber zwei Zeilen
+   * laeuft ("MWST-" / "Code", "Sub-" / "total") und dem darueber noch Leerzeilen
+   * vorausgehen koennen. Die gefundene Zeile wird darum spaltenweise mit der Zeile
+   * direkt darueber zusammengezogen, damit "MWST-Code" und "Sub-total" wieder
+   * vollstaendig sind. Genau eine Vorzeile — mehr waere Raterei.
+   */
+  kopfSpalte?: string;
+};
+
+export function csvRecords(text: string, sep = ';', opts: CsvOptionen = {}): { header: string[]; records: Array<Record<string, string>> } {
   const rows = parseCsv(text, sep);
   if (rows.length === 0) return { header: [], records: [] };
-  const header = rows[0];
-  const records = rows.slice(1).map((r) => {
+  if (opts.kopfSpalte === undefined) {
+    // Unveraenderter Weg der FileMaker-Exporte: Zeile 1 ist der Kopf, woertlich.
+    return baueRecords(rows[0], rows.slice(1));
+  }
+  const kopf = rows.findIndex((r) => (r[0] ?? '').trim() === opts.kopfSpalte);
+  if (kopf < 0) {
+    throw new ValidationError(
+      `Kopfzeile mit "${opts.kopfSpalte}" in der ersten Spalte nicht gefunden — ` +
+      `ist das die richtige Datei bzw. das richtige Blatt?`);
+  }
+  const oben = kopf > 0 ? rows[kopf - 1] : [];
+  return baueRecords(rows[kopf].map((h, i) => `${(oben[i] ?? '').trim()}${h.trim()}`), rows.slice(kopf + 1));
+}
+
+function baueRecords(header: string[], zeilen: string[][]): { header: string[]; records: Array<Record<string, string>> } {
+  const records = zeilen.map((r) => {
     const rec: Record<string, string> = {};
     header.forEach((h, i) => { rec[h] = r[i] ?? ''; });
     return rec;
