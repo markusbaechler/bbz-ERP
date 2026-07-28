@@ -81,4 +81,12 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 .sperrhinweis { background: #FBF3E3; border: 1px solid var(--offen); padding: .7rem; }
 .sperrhinweis label { margin-right: .8rem; }
 
+#neu-pos { border: 1px solid var(--linie); padding: .7rem; margin: 1rem 0; }
+#neu-pos label { margin-right: .8rem; }
+.summen { width: auto; min-width: 26rem; margin: 1rem 0; }
+.summen td { border-bottom: 0; padding: .15rem .6rem; }
+.summen tr.total td { border-top: 1px solid var(--tinte); font-weight: 600; }
+.aktionen { display: flex; gap: .5rem; margin: 1rem 0; }
+.aktionen a { text-decoration: none; }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

@@ -1,4 +1,111 @@
-import { registriere } from '../app.js';
+import { registriere, aktualisiereSperrstreifen, aktion } from '../app.js';
+import { hole, sende } from '../api.js';
+import { berechneMwst } from '../ui/mwst.js';
+import { franken, datum, prozent, menge, text } from '../ui/format.js';
+import { laedt } from '../ui/zustand.js';
 
-// Platzhalter — Task 6 fuellt die Rechnungserfassung.
-registriere(/^\/rechnung\/([^/]+)$/, (el) => { el.innerHTML = '<p>Rechnung (folgt)</p>'; });
+const SAETZE = [8.1, 2.6, 3.8, 0];
+
+registriere(/^\/rechnung\/([0-9a-f-]+)$/, async (el, [id]) => {
+  laedt(el);
+  const r = await hole(`/rechnung/${id}`);
+  const p = await hole(`/projekt/${r.projektId}`);
+  const zaehler = await aktualisiereSperrstreifen();
+  const entwurf = r.status === 'offen_prov' || r.status === 'def_vereinbart';
+
+  const e = berechneMwst(r.positionen.map((x) => ({ betrag: x.betragNetto, satz: x.mwstSatz })), r.mwstModus);
+
+  el.innerHTML = `
+    <h1 class="titel-nummer">${r.nummer ? text(r.nummer) : 'Entwurf'}</h1>
+    <p class="titel-name">${text(p.nummer)} · ${text(p.name)} · ${text(p.auftraggeberName)}</p>
+    <p><span class="status status-${text(r.status)}">${text(r.status)}</span> · ${datum(r.datum)} ·
+       MWSt ${r.mwstModus}.</p>
+
+    <table id="positionen">
+      <thead><tr>
+        <th>Beschreibung</th><th class="betrag">Menge</th><th>Einheit</th>
+        <th class="betrag">Einzelpreis</th><th class="betrag">MWSt</th><th class="betrag">Betrag</th>
+      </tr></thead>
+      <tbody>${r.positionen.map((x) => `<tr>
+        <td>${text(x.beschreibung)}</td>
+        <td class="betrag">${menge(x.menge)}</td>
+        <td>${text(x.einheit)}</td>
+        <td class="betrag">${franken(x.einzelpreis)}</td>
+        <td class="betrag">${prozent(x.mwstSatz)}</td>
+        <td class="betrag">${franken(x.betragNetto)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+
+    ${entwurf ? `<fieldset id="neu-pos">
+      <legend>Position hinzufügen</legend>
+      <label>Beschreibung <span class="eck"><input id="p-text" size="36"></span></label>
+      <label>Menge <span class="eck"><input id="p-menge" size="6" inputmode="decimal" value="1"></span></label>
+      <label>Einheit <span class="eck"><select id="p-einheit">
+        <option>Std</option><option>Tag</option><option>Pauschal</option><option>Stk</option>
+      </select></span></label>
+      <label>Einzelpreis <span class="eck"><input id="p-preis" size="10" inputmode="decimal"></span></label>
+      <label>MWSt <span class="eck"><select id="p-satz">
+        ${SAETZE.map((s) => `<option value="${s}">${prozent(s)}</option>`).join('')}
+      </select></span></label>
+      <button id="p-add">Hinzufügen</button>
+    </fieldset>` : ''}
+
+    <!-- Aufbau wie die MWSt-Zusammenfassung auf dem gedruckten Beleg -->
+    <table class="summen">
+      <tbody>
+        ${e.proSatz.map((z) => `<tr>
+          <td>Netto ${prozent(z.satz)}</td><td class="betrag">${franken(z.netto)}</td>
+          <td>MWSt</td><td class="betrag">${franken(z.steuer)}</td>
+        </tr>`).join('')}
+        <tr class="total">
+          <td>Total netto</td><td class="betrag">${franken(e.totalNetto)}</td>
+          <td>Total MWSt</td><td class="betrag">${franken(e.totalSteuer)}</td>
+        </tr>
+        <tr class="total"><td colspan="3">Rechnungsbetrag</td>
+          <td class="betrag">${franken(e.totalBrutto)}</td></tr>
+      </tbody>
+    </table>
+
+    <div class="aktionen">
+      ${entwurf ? `<button id="fest" class="haupt">Festschreiben</button>` : ''}
+      ${r.nummer ? `<a href="/rechnung/${r.id}/pdf" target="_blank"><button>PDF öffnen</button></a>` : ''}
+      <a href="#/projekt/${p.id}"><button>Zurück zum Projekt</button></a>
+    </div>
+    <p id="sperrgrund" class="hinweis-fm"></p>`;
+
+  const hinzu = el.querySelector('#p-add');
+  if (hinzu) hinzu.addEventListener('click', aktion(async () => {
+    await sende('POST', `/rechnung/${r.id}/position`, {
+      beschreibung: el.querySelector('#p-text').value.trim(),
+      menge: Number(el.querySelector('#p-menge').value),
+      einheit: el.querySelector('#p-einheit').value,
+      einzelpreis: Number(el.querySelector('#p-preis').value),
+      mwstSatz: Number(el.querySelector('#p-satz').value),
+    });
+    location.reload();
+  }));
+
+  const fest = el.querySelector('#fest');
+  if (fest) {
+    const gesperrt = zaehler?.gesperrt ?? false;
+    const ohnePositionen = r.positionen.length === 0;
+    const adresseFehlt = p.auftraggeberAdresseUnvollstaendig;
+    fest.disabled = gesperrt || ohnePositionen || adresseFehlt;
+    el.querySelector('#sperrgrund').textContent =
+      gesperrt ? `Festschreiben gesperrt: der Rechnungszähler steht auf ${zaehler.wert}, Untergrenze ${zaehler.untergrenze}. Unter „System" setzen.`
+      : adresseFehlt ? 'Festschreiben gesperrt: dem Auftraggeber fehlt die Adresse. Beim Projekt nachtragen.'
+      : ohnePositionen ? 'Festschreiben möglich, sobald mindestens eine Position erfasst ist.'
+      : '';
+
+    fest.addEventListener('click', aktion(async () => {
+      const ok = confirm(
+        `Rechnung festschreiben?\n\n` +
+        `Es wird eine Rechnungsnummer unwiderruflich vergeben. ` +
+        `Die Rechnung ist danach nicht mehr änderbar — Korrekturen nur über Storno und Neuerfassung.\n\n` +
+        `Betrag: ${franken(e.totalBrutto)}`);
+      if (!ok) return;
+      await sende('POST', `/rechnung/${r.id}/festschreiben`, { erstellerKuerzel: p.projektleitungKuerzel ?? undefined });
+      location.reload();
+    }));
+  }
+});
