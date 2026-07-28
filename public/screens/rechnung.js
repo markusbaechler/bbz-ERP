@@ -19,7 +19,7 @@ registriere(/^\/rechnung\/([0-9a-f-]+)$/, async (el, [id]) => {
     <h1 class="titel-nummer">${r.nummer ? text(r.nummer) : 'Entwurf'}</h1>
     <p class="titel-name">${text(p.nummer)} · ${text(p.name)} · ${text(p.auftraggeberName)}</p>
     <p><span class="status status-${text(r.status)}">${text(r.status)}</span> · ${datum(r.datum)} ·
-       MWSt ${r.mwstModus}.</p>
+       MWSt ${text(r.mwstModus)}.</p>
 
     <table id="positionen">
       <thead><tr>
@@ -71,7 +71,17 @@ registriere(/^\/rechnung\/([0-9a-f-]+)$/, async (el, [id]) => {
       ${r.nummer ? `<a href="/rechnung/${r.id}/pdf" target="_blank"><button>PDF öffnen</button></a>` : ''}
       <a href="#/projekt/${p.id}"><button>Zurück zum Projekt</button></a>
     </div>
-    <p id="sperrgrund" class="hinweis-fm"></p>`;
+    <p id="sperrgrund" class="hinweis-fm"></p>
+
+    ${entwurf ? `<div id="fest-bestaetigung" class="fest-bestaetigung" hidden>
+      <p>Es wird eine Rechnungsnummer <strong>unwiderruflich</strong> vergeben.
+         Die Rechnung ist danach nicht mehr änderbar — Korrekturen nur über Storno und Neuerfassung.</p>
+      <p>Betrag: <span class="betrag">${franken(e.totalBrutto)}</span></p>
+      <div class="aktionen">
+        <button id="fest-abbrechen">Abbrechen</button>
+        <button id="fest-bestaetigen" class="haupt">Endgültig festschreiben</button>
+      </div>
+    </div>` : ''}`;
 
   const hinzu = el.querySelector('#p-add');
   if (hinzu) hinzu.addEventListener('click', aktion(async () => {
@@ -97,13 +107,27 @@ registriere(/^\/rechnung\/([0-9a-f-]+)$/, async (el, [id]) => {
       : ohnePositionen ? 'Festschreiben möglich, sobald mindestens eine Position erfasst ist.'
       : '';
 
-    fest.addEventListener('click', aktion(async () => {
-      const ok = confirm(
-        `Rechnung festschreiben?\n\n` +
-        `Es wird eine Rechnungsnummer unwiderruflich vergeben. ` +
-        `Die Rechnung ist danach nicht mehr änderbar — Korrekturen nur über Storno und Neuerfassung.\n\n` +
-        `Betrag: ${franken(e.totalBrutto)}`);
-      if (!ok) return;
+    const bestaetigung = el.querySelector('#fest-bestaetigung');
+    const abbrechen = el.querySelector('#fest-abbrechen');
+    const bestaetigen = el.querySelector('#fest-bestaetigen');
+
+    fest.addEventListener('click', () => {
+      fest.hidden = true;
+      bestaetigung.hidden = false;
+      abbrechen.focus();
+    });
+
+    abbrechen.addEventListener('click', () => {
+      bestaetigung.hidden = true;
+      fest.hidden = false;
+      fest.focus();
+    });
+
+    bestaetigung.addEventListener('keydown', (ereignis) => {
+      if (ereignis.key === 'Escape') abbrechen.click();
+    });
+
+    bestaetigen.addEventListener('click', aktion(async () => {
       await sende('POST', `/rechnung/${r.id}/festschreiben`, { erstellerKuerzel: p.projektleitungKuerzel ?? undefined });
       location.reload();
     }));

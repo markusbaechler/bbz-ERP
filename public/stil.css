@@ -29,8 +29,8 @@ main { padding: 1rem; }
 table { border-collapse: collapse; width: 100%; }
 th, td { padding: .3rem .6rem; border-bottom: 1px solid var(--linie); text-align: left; }
 th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--tinte-matt); font-weight: 600; cursor: pointer; }
-td.betrag, th.betrag { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--code); }
-td.betrag.minus { color: var(--storno); }
+.betrag { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--code); }
+.betrag.minus { color: var(--storno); }
 tbody tr:hover { background: #F0F2F4; }
 tbody tr[role="link"] { cursor: pointer; }
 
@@ -88,5 +88,11 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 .summen tr.total td { border-top: 1px solid var(--tinte); font-weight: 600; }
 .aktionen { display: flex; gap: .5rem; margin: 1rem 0; }
 .aktionen a { text-decoration: none; }
+
+/* Ersetzt den nativen confirm() beim Festschreiben: eine Frage, keine Fehlermeldung —
+   darum Ocker wie die uebrigen Vorbedingungs-Hinweise, nicht Rot. */
+.fest-bestaetigung { background: #FBF3E3; border: 1px solid var(--offen); padding: .7rem; margin: 1rem 0; max-width: 34rem; }
+.fest-bestaetigung p { margin: 0 0 .5rem; }
+.fest-bestaetigung .aktionen { margin: .5rem 0 0; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
