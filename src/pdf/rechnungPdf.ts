@@ -17,6 +17,9 @@ export function erzeugeRechnungPdf(rechnung: Rechnung, positionen: Rechnungsposi
   doc.moveDown();
   // Empfaenger
   doc.fontSize(11).text(auftraggeber.name);
+  // Zusatzzeile (z. B. Institut/Abteilung einer mehrzeiligen FileMaker-Firma) - nur wenn vorhanden,
+  // sonst entstuende eine unerwuenschte Luecke im Adressblock.
+  if (auftraggeber.zusatz) doc.text(auftraggeber.zusatz);
   doc.text(auftraggeber.strasse);
   doc.text(`${auftraggeber.plz} ${auftraggeber.ort}`);
   doc.moveDown();
