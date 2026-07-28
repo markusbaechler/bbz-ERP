@@ -6,8 +6,10 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
     "types": ["node"],
     "outDir": "dist"
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "public/ui/format.js", "public/ui/mwst.js"]
 }

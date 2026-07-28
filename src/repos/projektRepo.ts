@@ -1,6 +1,8 @@
 import type pg from 'pg';
-import type { Projekt, MigrationProjektInput } from '../domain/types';
+import type { Projekt, MigrationProjektInput, ProjektListenZeile, ProjektDetail, RechnungListenZeile } from '../domain/types';
 import { ValidationError, NotFoundError } from '../domain/errors';
+
+const zahl = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
 
 const map = (r: any): Projekt => ({
   id: r.id, nummer: r.nummer, stammnummer: r.stammnummer, jahr: r.jahr,
@@ -115,4 +117,57 @@ export async function projektSummen(pool: pg.Pool, jahr: number): Promise<{ anza
      from projekt where jahr=$1`, [jahr]);
   const row = r.rows[0];
   return { anzahl: row.anzahl, budgetChf: Number(row.budget_chf), offenProv: Number(row.offen_prov), abgerechnet: Number(row.abgerechnet) };
+}
+
+export async function listProjekteMitAuftraggeber(
+  pool: pg.Pool, filter: { jahr?: number } = {},
+): Promise<ProjektListenZeile[]> {
+  const args: any[] = [];
+  let where = '';
+  if (filter.jahr !== undefined) { args.push(filter.jahr); where = `where p.jahr=$${args.length}`; }
+  const r = await pool.query(
+    `select p.id, p.nummer, p.jahr, p.name, p.bereich, p.auftraggeber_id, a.name as auftraggeber_name,
+            p.budget_chf, p.fm_abgerechnet, p.fm_offen_prov
+     from projekt p join auftraggeber a on a.id = p.auftraggeber_id
+     ${where} order by p.nummer`, args);
+  return r.rows.map((x) => ({
+    id: x.id, nummer: x.nummer, jahr: x.jahr, name: x.name, bereich: x.bereich,
+    auftraggeberId: x.auftraggeber_id, auftraggeberName: x.auftraggeber_name,
+    budgetChf: zahl(x.budget_chf), fmAbgerechnet: zahl(x.fm_abgerechnet), fmOffenProv: zahl(x.fm_offen_prov),
+  }));
+}
+
+export async function getProjektDetail(pool: pg.Pool, id: string): Promise<ProjektDetail> {
+  const r = await pool.query(
+    `select p.*, a.name as auftraggeber_name, a.zusatz as auftraggeber_zusatz,
+            a.strasse, a.plz, a.ort, a.land, a.adresse_unvollstaendig,
+            ke.nummer as ertragskonto_nummer, ke.bezeichnung as ertragskonto_bezeichnung,
+            ka.nummer as aufwand_konto_nummer
+     from projekt p
+     join auftraggeber a on a.id = p.auftraggeber_id
+     left join konto ke on ke.id = p.ertragskonto_id
+     left join konto ka on ka.id = p.aufwand_konto_id
+     where p.id=$1`, [id]);
+  if (!r.rowCount) throw new NotFoundError(`Projekt ${id} nicht gefunden`);
+  const x = r.rows[0];
+  return {
+    ...map(x),
+    auftraggeberName: x.auftraggeber_name, auftraggeberZusatz: x.auftraggeber_zusatz,
+    auftraggeberStrasse: x.strasse, auftraggeberPlz: x.plz, auftraggeberOrt: x.ort, auftraggeberLand: x.land,
+    auftraggeberAdresseUnvollstaendig: x.adresse_unvollstaendig,
+    ansprechperson: x.ansprechperson, beschrieb: x.beschrieb, projektleitungKuerzel: x.projektleitung_kuerzel,
+    alteProjektNr: x.alte_projekt_nr, aufwandBudgetChf: zahl(x.aufwand_budget_chf),
+    ertragskontoNummer: x.ertragskonto_nummer, ertragskontoBezeichnung: x.ertragskonto_bezeichnung,
+    aufwandKontoNummer: x.aufwand_konto_nummer,
+    fmAbgerechnet: zahl(x.fm_abgerechnet), fmOffenProv: zahl(x.fm_offen_prov),
+  };
+}
+
+export async function listRechnungenFuerProjekt(pool: pg.Pool, projektId: string): Promise<RechnungListenZeile[]> {
+  const r = await pool.query(
+    `select id, nummer, datum, status, total_brutto from rechnung
+     where projekt_id=$1 order by datum desc, erstellt_am desc`, [projektId]);
+  return r.rows.map((x) => ({
+    id: x.id, nummer: x.nummer, datum: x.datum, status: x.status, totalBrutto: Number(x.total_brutto),
+  }));
 }
