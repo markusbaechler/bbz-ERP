@@ -23,6 +23,11 @@ describe('datum', () => {
   it('zeigt fehlende Werte als Gedankenstrich', () => {
     expect(datum(null)).toBe('—');
   });
+  it('zeigt unsaubere Eingaben als Gedankenstrich statt als Datum', () => {
+    expect(datum('banana')).toBe('—');
+    expect(datum('2026-07')).toBe('—');
+    expect(datum('27.07.2026')).toBe('—');
+  });
 });
 
 describe('prozent und menge', () => {
