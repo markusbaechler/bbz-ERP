@@ -69,6 +69,7 @@ Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git
   - **Ohne `--konten` bleibt jede Kontierung offen** — und der Report sagt das **einmal** („Kontenplan nicht importiert — alle Kontierungen bleiben offen; zuerst `--konten=` laufen lassen") statt 151-mal je Projekt.
   - **Der Projekt-Dry-Run liest jetzt den Kontenplan** aus der Datenbank (nur lesend, über `src/repos`) — es gibt keine im Code hinterlegte Kontenliste mehr, gegen die er prüfen könnte. Dadurch melden Dry-Run und Apply **zwingend** dieselben Kontierungs-Warnungen; vorher konnten sie auseinanderlaufen. Geschrieben wird im Dry-Run weiterhin nichts.
   - **Typ aus der führenden Ziffer** (`3` → Ertrag, `4`–`9` → Aufwand). Das ist die Gliederung des Blatts, nicht die betriebswirtschaftliche Wahrheit jeder Zeile: `8000 Ausserordentlicher Ertrag` und `6810 Finanzertrag` sind der Sache nach Ertrag und stehen hier unter Aufwand. Sie kommen im Projekt-Export nicht vor; eine feinere Regel wäre ohne Vorgabe des Kunden geraten.
+- **Plan 6 Durchstich (erster Schnitt)** ✅ — statische Auslieferung via `@fastify/static`, Vanilla-ES-Module ohne Build unter `public/`, vier Screens (Projektliste, Projektdetail, Rechnungserfassung, Systemzustand), drei neue Lese-Endpunkte. MWSt-Rechnung im Browser gegen den Server abgeglichen (`test/browserMwst.test.ts`). Nachweis: `docs/durchstich-nachweis.md`.
 
 ## Nächste Schritte (für neue Session)
 1. **Plan 5 abschliessen:** PR #5 (`plan5-migration-filemaker`) reviewen und mergen; danach `plan5b-rechnungszaehler` (setzt darauf auf) als eigenen PR nachziehen.
@@ -76,6 +77,9 @@ Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git
 3. Danach: Swico/S1-String, PDF-Feinlayout, camt-Import (v2).
 
 ## Offene Punkte / To-verify
+- **Frontend-Suche laeuft im Browser** — traegt bei 151 Projekten, nicht beim Vollexport (~4967). Serverseitige Suche/Paginierung nachziehen, sobald der Vollexport da ist.
+- **`public/ui/mwst.js` ist ein Spiegel von `src/domain/mwst.ts`.** Aenderungen muessen in beiden erfolgen; `test/browserMwst.test.ts` faengt Abweichungen ab.
+- **`public/` liegt ausserhalb von tsconfig** — `tsc --noEmit` deckt die Frontend-Module nicht ab.
 - **Aus FileMaker nachzuziehen (Befunde Plan 5, blockieren die Migration):**
   - **Adressen-Export der Auftraggeber** — **erledigt**, der Export ist da und importierbar (`npm run migrate:fm -- --adressen=../fm-discovery/export/adressen_export.csv --apply`, s.o.). Offen bleibt genau eines: **`20577` „bbz st.gallen ag"** hat in der Adressdatei keine Adresse und ist deshalb weiterhin nicht fakturierbar. Das ist die eigene Firma, die als Auftraggeber für interne Projekte (z.B. `6231.26` „Ausgaben/Einnahmen bbz ohne Projektbezug") geführt wird — vermutlich braucht sie gar keinen QR-Beleg. Wenn doch: die eigene Adresse aus `src/config/creditor.ts` per `PUT /auftraggeber/:id` nachtragen, dann fällt das Kennzeichen. Ausserdem festhalten: bei **10** der 49 Auftraggeber führt die Datei **kein Land**, dort steht jetzt ein *angenommenes* `CH` (vierstellige PLZ + Ort) — im Report einzeln aufgeführt, bei Bedarf gegen FileMaker prüfen. Die eine `FL`-Adresse ist unangetastet.
   - **Vollständiger Projekt-Export** — `export_daten.csv` enthält nur Jahr 2026 (151 von ~4967 Projekten). Vollexport aller Jahrgänge nachziehen; der Import ist idempotent und kann erneut laufen.
