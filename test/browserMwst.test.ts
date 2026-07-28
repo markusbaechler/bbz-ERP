@@ -9,6 +9,12 @@ const faelle: { positionen: { betrag: number; satz: number }[]; modus: 'exkl' | 
   { positionen: [{ betrag: 333.33, satz: 8.1 }, { betrag: 66.67, satz: 8.1 }], modus: 'exkl' },
   { positionen: [{ betrag: 1, satz: 0 }], modus: 'exkl' },
   { positionen: [], modus: 'exkl' },
+  // Befund I7: erst ab drei verschiedenen Saetzen und erst im Modus `inkl`
+  // koennten die beiden Umsetzungen ueberhaupt auseinanderlaufen — die
+  // Rueckrechnung je Satz vor der Gruppierung ist die Stelle, an der sich ein
+  // Unterschied verstecken wuerde.
+  { positionen: [{ betrag: 1000, satz: 8.1 }, { betrag: 500, satz: 2.6 }, { betrag: 200, satz: 3.8 }, { betrag: 50, satz: 0 }], modus: 'exkl' },
+  { positionen: [{ betrag: 1081, satz: 8.1 }, { betrag: 513, satz: 2.6 }, { betrag: 103.80, satz: 3.8 }], modus: 'inkl' },
 ];
 
 describe('MWSt im Browser', () => {
