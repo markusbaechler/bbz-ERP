@@ -22,6 +22,28 @@ describe('konto-Upsert', () => {
     expect((await findKontoByNummer(getPool(), '3100'))?.id).toBe(a.konto.id);
     expect(await findKontoByNummer(getPool(), '9999')).toBeNull();
   });
+
+  // Der Kontenplan des Kunden fuehrt je Konto einen MWST-Code (die Behandlung im
+  // Buchhaltungssystem, z.B. 510/700/U00) und ein Kennzeichen "Inaktiv". Der Code wird
+  // roh mitgefuehrt, nicht in einen Satz uebersetzt; "Inaktiv" faellt auf das bereits
+  // vorhandene `aktiv` — zwei Flags mit derselben Bedeutung gibt es nicht.
+  it('fuehrt MWST-Code und aktiv mit', async () => {
+    const a = await upsertKonto(getPool(), {
+      nummer: '3200', bezeichnung: 'B+V / Zertifizierungen ohne SAQ', typ: 'Ertrag', mwstCode: '510',
+    });
+    expect(a.konto.mwstCode).toBe('510');
+    expect(a.konto.aktiv).toBe(true);
+
+    // Ein stillgelegtes Konto bleibt importierbar (historische Projekte verweisen darauf),
+    // traegt aber aktiv=false, damit die Oberflaeche es spaeter nicht mehr anbietet.
+    const b = await upsertKonto(getPool(), {
+      nummer: '3200', bezeichnung: 'B+V / Zertifizierungen ohne SAQ', typ: 'Ertrag', mwstCode: 'U00', aktiv: false,
+    });
+    expect(b.neu).toBe(false);
+    expect(b.konto.mwstCode).toBe('U00');
+    expect(b.konto.aktiv).toBe(false);
+    expect((await findKontoByNummer(getPool(), '3200'))?.aktiv).toBe(false);
+  });
 });
 
 describe('mwst_satz-Upsert', () => {

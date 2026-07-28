@@ -1,0 +1,14 @@
+-- Der echte Kontenplan des Kunden ("Kontoplan 2024.xlsx", Blatt Erfolgsrechnung)
+-- fuehrt je Konto zwei Felder, die bisher fehlten.
+--
+-- mwst_code: die MWSt-Behandlung im Buchhaltungssystem des Kunden (510, 700, U00,
+-- 520, 210, 230, 300, ...). Roh mitgefuehrt und bewusst NICHT in einen Prozentsatz
+-- uebersetzt — die Schluesseltabelle dazu liegt beim Kunden, jede eigene Auslegung
+-- waere erfunden. Nullable: 49 der 177 Konten fuehren keinen Code.
+--
+-- "Inaktiv" der Quelle bekommt KEINE eigene Spalte: `konto.aktiv` (002_stammdaten.sql)
+-- sagt bereits dasselbe, nur umgekehrt. Zwei Flags mit derselben Bedeutung liefen
+-- unweigerlich auseinander; der Import setzt aktiv = NOT Inaktiv. Stillgelegte Konten
+-- bleiben importierbar (historische Projekte verweisen darauf), die Oberflaeche kann
+-- sie spaeter ueber aktiv=false von neuen Buchungen ausschliessen.
+alter table konto add column mwst_code text;
