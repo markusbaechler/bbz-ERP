@@ -1,4 +1,4 @@
-import { registriere, aktualisiereSperrstreifen } from '../app.js';
+import { registriere, aktualisiereSperrstreifen, aktion } from '../app.js';
 import { hole, sende } from '../api.js';
 import { franken, datum, text } from '../ui/format.js';
 import { tabelle } from '../ui/tabelle.js';
@@ -53,17 +53,17 @@ registriere(/^\/projekt\/([0-9a-f-]+)$/, async (el, [id]) => {
     ], rechnungen, (r) => { location.hash = `#/rechnung/${r.id}`; }));
   }
 
-  el.querySelector('#neu').addEventListener('click', async () => {
+  el.querySelector('#neu').addEventListener('click', aktion(async () => {
     const r = await sende('POST', '/rechnung', {
       projektId: p.id, auftraggeberId: p.auftraggeberId,
       datum: new Date().toISOString().slice(0, 10),
       betreff: p.name, mwstModus: p.mwstModus,
     });
     location.hash = `#/rechnung/${r.id}`;
-  });
+  }));
 
   const speichern = el.querySelector('#a-speichern');
-  if (speichern) speichern.addEventListener('click', async () => {
+  if (speichern) speichern.addEventListener('click', aktion(async () => {
     await sende('PUT', `/auftraggeber/${p.auftraggeberId}`, {
       strasse: el.querySelector('#a-strasse').value.trim(),
       plz: el.querySelector('#a-plz').value.trim(),
@@ -72,5 +72,5 @@ registriere(/^\/projekt\/([0-9a-f-]+)$/, async (el, [id]) => {
     });
     await aktualisiereSperrstreifen();
     location.reload();
-  });
+  }));
 });
