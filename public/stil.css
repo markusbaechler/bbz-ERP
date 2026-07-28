@@ -28,11 +28,15 @@ main { padding: 1rem; }
 
 table { border-collapse: collapse; width: 100%; }
 th, td { padding: .3rem .6rem; border-bottom: 1px solid var(--linie); text-align: left; }
-th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--tinte-matt); font-weight: 600; cursor: pointer; }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--tinte-matt); font-weight: 600; }
 .betrag { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--code); }
 .betrag.minus { color: var(--storno); }
-tbody tr:hover { background: #F0F2F4; }
-tbody tr[role="link"] { cursor: pointer; }
+/* Zeiger und Hover nur dort, wo wirklich etwas passiert: `tabelle()` setzt
+   `sortierbar` bzw. `klickbar`. Global versprachen sie Bedienbarkeit auch den
+   Tabellen #positionen und .summen, die keine haben (Befund M9). */
+th.sortierbar { cursor: pointer; }
+tbody tr.klickbar { cursor: pointer; }
+tbody tr.klickbar:hover { background: #F0F2F4; }
 
 .status { font-size: .78rem; font-weight: 600; }
 .status-offen_prov { color: var(--tinte-matt); }
@@ -83,6 +87,9 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 
 #neu-pos { border: 1px solid var(--linie); padding: .7rem; margin: 1rem 0; }
 #neu-pos label { margin-right: .8rem; }
+/* Meldung zur roten Eckmarke (.eck.fehlerhaft): eine abgewiesene Eingabe ist ein
+   echter Fehler, nicht eine Vorbedingung — darum Rot und nicht Ocker. */
+.feldfehler { color: var(--storno); font-size: .85rem; margin: .5rem 0 0; }
 .summen { width: auto; min-width: 26rem; margin: 1rem 0; }
 .summen td { border-bottom: 0; padding: .15rem .6rem; }
 .summen tr.total td { border-top: 1px solid var(--tinte); font-weight: 600; }

@@ -11,15 +11,22 @@ export function zeigeFehler(text) {
   banner.textContent = text;
   banner.hidden = false;
 }
-function verbergeFehler() { banner.hidden = true; }
+export function verbergeFehler() { banner.hidden = true; }
 
 /**
  * Umhuellt einen asynchronen Ereignisbehandler: Fehler landen sichtbar im Banner
  * statt als unbehandelte Promise-Ablehnung, und das ausloesende Element ist
  * waehrend des Laufs gesperrt (kein Doppelklick, keine zwei Entwuerfe).
+ *
+ * Zuerst wird der Balken der vorigen Aktion geloescht. Die uebrigen Behandler
+ * enden in `location.reload()` oder einem Hashwechsel und kommen damit ueber
+ * `route()` zu `verbergeFehler()`; `#/system` zeichnet an Ort und Stelle neu —
+ * dort stand sonst die rote Meldung des Fehlversuchs ueber der Erfolgsmeldung
+ * des naechsten (Befund I3).
  */
 export function aktion(fn) {
   return async (ereignis) => {
+    verbergeFehler();
     const el = ereignis?.currentTarget;
     if (el) el.disabled = true;
     try {

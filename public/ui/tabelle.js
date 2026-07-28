@@ -19,16 +19,22 @@ export function tabelle(spalten, zeilen, beiKlick) {
       const v = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'de-CH');
       return absteigend ? -v : v;
     });
+    // Kein role="button" auf <th> und kein role="link" auf <tr>: beide wuerden
+    // die impliziten Tabellenrollen (columnheader, row) ersetzen. Damit waere
+    // das aria-sort auf demselben Element ungueltig und die Zeilen fielen aus
+    // der Tabellennavigation der Screenreader (Befund M8). Tastaturbedienung
+    // und aria-sort bleiben; `sortierbar`/`klickbar` sind die Haken fuer den
+    // Zeiger-Cursor im Stylesheet (Befund M9).
     t.innerHTML =
       `<thead><tr>${spalten.map((s) => {
         const sortiertHier = sortFeld === s.feld;
         const ariaSort = sortiertHier ? (absteigend ? 'descending' : 'ascending') : 'none';
-        return `<th class="${s.klasse ?? ''}" data-feld="${s.feld}" tabindex="0" role="button" ` +
-          `aria-sort="${ariaSort}">${text(s.titel)}${sortiertHier ? (absteigend ? ' ↓' : ' ↑') : ''}</th>`;
+        return `<th class="sortierbar ${text(s.klasse ?? '')}" data-feld="${text(s.feld)}" tabindex="0" ` +
+          `aria-sort="${text(ariaSort)}">${text(s.titel)}${sortiertHier ? (absteigend ? ' ↓' : ' ↑') : ''}</th>`;
       }).join('')}</tr></thead>` +
       `<tbody>${daten.map((z, i) =>
-        `<tr data-i="${i}"${beiKlick ? ' tabindex="0" role="link"' : ''}>${spalten.map((s) =>
-          `<td class="${s.klasse ?? ''}">${s.render ? s.render(z[s.feld])
+        `<tr data-i="${text(i)}"${beiKlick ? ' class="klickbar" tabindex="0"' : ''}>${spalten.map((s) =>
+          `<td class="${text(s.klasse ?? '')}">${s.render ? s.render(z[s.feld])
             : (z[s.feld] === null || z[s.feld] === undefined ? '—' : text(z[s.feld]))}</td>`
         ).join('')}</tr>`).join('')}</tbody>`;
 

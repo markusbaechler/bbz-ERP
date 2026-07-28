@@ -3,6 +3,7 @@ import { hole, sende } from '../api.js';
 import { berechneMwst } from '../ui/mwst.js';
 import { franken, datum, prozent, menge, text } from '../ui/format.js';
 import { laedt } from '../ui/zustand.js';
+import { pruefePosition } from '../ui/eingabe.js';
 
 const SAETZE = [8.1, 2.6, 3.8, 0];
 
@@ -45,9 +46,10 @@ registriere(/^\/rechnung\/([0-9a-f-]+)$/, async (el, [id]) => {
       </select></span></label>
       <label>Einzelpreis <span class="eck"><input id="p-preis" size="10" inputmode="decimal"></span></label>
       <label>MWSt <span class="eck"><select id="p-satz">
-        ${SAETZE.map((s) => `<option value="${s}">${prozent(s)}</option>`).join('')}
+        ${SAETZE.map((s) => `<option value="${text(s)}">${prozent(s)}</option>`).join('')}
       </select></span></label>
       <button id="p-add">Hinzufügen</button>
+      <p id="p-fehler" class="feldfehler" hidden></p>
     </fieldset>` : ''}
 
     <!-- Aufbau wie die MWSt-Zusammenfassung auf dem gedruckten Beleg -->
@@ -68,8 +70,8 @@ registriere(/^\/rechnung\/([0-9a-f-]+)$/, async (el, [id]) => {
 
     <div class="aktionen">
       ${entwurf ? `<button id="fest" class="haupt">Festschreiben</button>` : ''}
-      ${r.nummer ? `<a href="/rechnung/${r.id}/pdf" target="_blank"><button>PDF öffnen</button></a>` : ''}
-      <a href="#/projekt/${p.id}"><button>Zurück zum Projekt</button></a>
+      ${r.nummer ? `<a href="/rechnung/${text(r.id)}/pdf" target="_blank"><button>PDF öffnen</button></a>` : ''}
+      <a href="#/projekt/${text(p.id)}"><button>Zurück zum Projekt</button></a>
     </div>
     <p id="sperrgrund" class="hinweis-fm"></p>
 
@@ -84,16 +86,50 @@ registriere(/^\/rechnung\/([0-9a-f-]+)$/, async (el, [id]) => {
     </div>` : ''}`;
 
   const hinzu = el.querySelector('#p-add');
-  if (hinzu) hinzu.addEventListener('click', aktion(async () => {
-    await sende('POST', `/rechnung/${r.id}/position`, {
-      beschreibung: el.querySelector('#p-text').value.trim(),
-      menge: Number(el.querySelector('#p-menge').value),
-      einheit: el.querySelector('#p-einheit').value,
-      einzelpreis: Number(el.querySelector('#p-preis').value),
-      mwstSatz: Number(el.querySelector('#p-satz').value),
-    });
-    location.reload();
-  }));
+  if (hinzu) {
+    // Zu jedem prueffaehigen Feld die Eckmarke, die im Fehlerfall rot wird.
+    const felder = {
+      beschreibung: el.querySelector('#p-text'),
+      menge: el.querySelector('#p-menge'),
+      einzelpreis: el.querySelector('#p-preis'),
+    };
+    const meldung = el.querySelector('#p-fehler');
+
+    function entmarkiere() {
+      for (const feld of Object.values(felder)) feld.closest('.eck')?.classList.remove('fehlerhaft');
+      meldung.hidden = true;
+      meldung.textContent = '';
+    }
+    function markiere(fehler) {
+      entmarkiere();
+      const feld = felder[fehler.feld];
+      feld.closest('.eck')?.classList.add('fehlerhaft');
+      meldung.textContent = fehler.meldung;
+      meldung.hidden = false;
+      feld.focus();
+    }
+    for (const feld of Object.values(felder)) feld.addEventListener('input', entmarkiere);
+
+    hinzu.addEventListener('click', aktion(async () => {
+      // Vor dem Senden pruefen, damit die Meldung auf Deutsch am Feld steht.
+      // Ohne das wurde aus „33,5" ein NaN, aus dem NaN durch JSON.stringify ein
+      // null und daraus ein englisches „Internal Server Error" (Befund I2).
+      const geprueft = pruefePosition({
+        beschreibung: felder.beschreibung.value,
+        menge: felder.menge.value,
+        einzelpreis: felder.einzelpreis.value,
+      });
+      if (geprueft.fehler) { markiere(geprueft.fehler); return; }
+      entmarkiere();
+
+      await sende('POST', `/rechnung/${r.id}/position`, {
+        ...geprueft.werte,
+        einheit: el.querySelector('#p-einheit').value,
+        mwstSatz: Number(el.querySelector('#p-satz').value),
+      });
+      location.reload();
+    }));
+  }
 
   const fest = el.querySelector('#fest');
   if (fest) {

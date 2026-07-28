@@ -1,6 +1,6 @@
 import { registriere } from '../app.js';
 import { hole } from '../api.js';
-import { franken } from '../ui/format.js';
+import { franken, text } from '../ui/format.js';
 import { tabelle } from '../ui/tabelle.js';
 import { laedt, leer } from '../ui/zustand.js';
 
@@ -10,7 +10,7 @@ registriere(/^\/projekte$/, async (el) => {
 
   el.innerHTML = `
     <h1 class="titel-nummer">Projekte</h1>
-    <p class="titel-name">${alle.length} Projekte</p>
+    <p class="titel-name">${text(alle.length)} Projekte</p>
     <div class="filterzeile">
       <label>Jahr <span class="eck"><input id="f-jahr" size="5" inputmode="numeric"></span></label>
       <label>Suche <span class="eck"><input id="f-text" size="30" placeholder="Nummer, Name oder Auftraggeber"></span></label>
@@ -32,10 +32,11 @@ registriere(/^\/projekte$/, async (el) => {
 
   function zeichne() {
     const jahr = el.querySelector('#f-jahr').value.trim();
-    const text = el.querySelector('#f-text').value.trim().toLowerCase();
+    // nicht `text` — das waere der importierte Maskierer, hier verdeckt
+    const suche = el.querySelector('#f-text').value.trim().toLowerCase();
     const gefiltert = alle.filter((p) =>
       (jahr === '' || String(p.jahr) === jahr) &&
-      (text === '' || `${p.nummer} ${p.name} ${p.auftraggeberName}`.toLowerCase().includes(text)));
+      (suche === '' || `${p.nummer} ${p.name} ${p.auftraggeberName}`.toLowerCase().includes(suche)));
     ziel.innerHTML = '';
     if (gefiltert.length === 0) { leer(ziel, 'Kein Projekt passt zu diesem Filter.'); return; }
     ziel.append(tabelle(spalten, gefiltert, (p) => { location.hash = `#/projekt/${p.id}`; }));

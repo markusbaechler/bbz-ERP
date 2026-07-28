@@ -10,6 +10,19 @@ import { registerRechnungRoutes } from './routes/rechnung';
 import { registerDebitorRoutes } from './routes/debitor';
 import { registerZaehlerRoutes } from './routes/zaehler';
 
+/**
+ * Adresse, an die sich der Server bindet. Vorgabe ist **loopback**: jede
+ * GET-Route ist unauthentifiziert und jeder Schreibzugriff haengt allein an
+ * `x-user-role`, einem Header, den jeder Client setzen kann. Bis echte Token da
+ * sind (Spec §3), gehoert der Dienst nicht ungefragt ins Netz — wer ihn oeffnen
+ * will, sagt es ausdruecklich mit `HTTP_HOST` (z. B. `0.0.0.0`), und zwar erst
+ * hinter Reverse Proxy und TLS.
+ */
+export function hoerAdresse(env: NodeJS.ProcessEnv = process.env): string {
+  const host = env.HTTP_HOST?.trim();
+  return host ? host : '127.0.0.1';
+}
+
 export function buildApp(pool: pg.Pool): FastifyInstance {
   const app = Fastify({ logger: false });
   app.decorateRequest('rolle', 'standard');
