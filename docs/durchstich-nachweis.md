@@ -73,15 +73,20 @@ ihn nie automatisch (Absicht, s. `HANDOVER.md`).
   in Schritt „Ausgangslage" beschriebene Zurücksetzen/Neu-Importieren der
   Datenbank und der Start von `npm run dev` — beides ausdrücklich Setup, nicht
   Teil der im Plan verlangten Kette.
-- Die Browser-Konsole zeigte während der Kette keine Fehler oder unbehandelten
-  Promise-Ablehnungen.
 
 ## Werkzeug-Hinweis
 
 Die Browser-Automatisierung (Chrome-DevTools-Protokoll) hing beim ersten
 `screenshot` nach Klicks gelegentlich für ~30s, bevor der zweite Versuch sofort
-gelang — ein Auffälligkeit des Automatisierungs-Tools, nicht der App: die Seite
-selbst reagierte bei jedem Zugriff sofort und korrekt. `form_input` (Werte
-direkt setzen statt Zeichen zu tippen) mündete zuverlässig in dieselben
-Formularwerte, die ein tippender Mensch erzeugt hätte, weil die App die Felder
-erst beim Klick auf „Hinzufügen"/„Zähler setzen" ausliest.
+gelang — eine Auffälligkeit des Automatisierungs-Tools, nicht der App: der
+jeweils angezeigte Zustand entsprach nach dem zweiten Versuch immer der
+erwarteten Antwort. `form_input` (Werte direkt setzen statt Zeichen zu tippen)
+mündete zuverlässig in dieselben Formularwerte, die ein tippender Mensch erzeugt
+hätte, weil die App die Felder erst beim Klick auf „Hinzufügen"/„Zähler setzen"
+ausliest.
+
+Zur Browser-Konsole lässt sich hier keine belastbare Aussage machen: sie wurde
+nur einmal abgefragt, und zwar erst nach Abschluss von Schritt 7 — die
+Aufzeichnung des Tools beginnt erst mit diesem ersten Abruf, erfasst also nichts
+aus den Schritten 1–7 selbst. Eine Aussage wie „keine Fehler während der Kette"
+wäre damit nicht gedeckt und wird hier bewusst nicht getroffen.
