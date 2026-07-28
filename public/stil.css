@@ -32,6 +32,7 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
 td.betrag, th.betrag { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--code); }
 td.betrag.minus { color: var(--storno); }
 tbody tr:hover { background: #F0F2F4; }
+tbody tr[role="link"] { cursor: pointer; }
 
 .status { font-size: .78rem; font-weight: 600; }
 .status-offen_prov { color: var(--tinte-matt); }
@@ -40,9 +41,19 @@ tbody tr:hover { background: #F0F2F4; }
 .status-bezahlt { color: var(--bezahlt); }
 .status-storniert { color: var(--storno); text-decoration: line-through; }
 
-/* Eckmarken: Signatur aus dem QR-Zahlteil — markieren ausschliesslich Eingabefelder */
-.eck { position: relative; display: inline-block; padding: 2px; }
-.eck > input, .eck > select { border: 0; background: transparent; font: inherit; color: inherit; padding: .25rem .35rem; }
+/* Filterzeilen: Beschriftung und Feld liegen dicht beieinander, nicht ueber
+   ein zufaelliges Leerzeichen im Markup getrennt. */
+.filterzeile { display: flex; gap: 1.5rem; align-items: baseline; margin: .5rem 0 1rem; }
+.filterzeile label { display: inline-flex; align-items: center; gap: .4rem; }
+
+/* Eckmarken: Signatur aus dem QR-Zahlteil — markieren ausschliesslich Eingabefelder.
+   Das Feld selbst braucht eine sichtbare Flaeche (Hintergrund + Grundlinie),
+   sonst schweben die Winkel frei statt die Ecken eines Feldes zu markieren. */
+.eck { position: relative; display: inline-flex; align-items: stretch; min-height: 1.7rem; padding: 2px; }
+.eck > input, .eck > select {
+  border: 0; border-bottom: 1px solid var(--linie); background: #fff; font: inherit; color: inherit;
+  padding: .25rem .35rem;
+}
 .eck::before, .eck::after {
   content: ""; position: absolute; width: 7px; height: 7px; pointer-events: none;
   border-color: var(--tinte-matt); border-style: solid;

@@ -1,5 +1,12 @@
 const CHF = new Intl.NumberFormat('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// Maskiert Freitext fuer die Verwendung in innerHTML — Projektname, Auftraggeber
+// und Bereich kommen ungeprueft aus dem FileMaker-Export.
+export function text(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 export function franken(n) {
   if (n === null || n === undefined) return '—';
   return CHF.format(n);

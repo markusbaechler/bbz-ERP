@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { franken, datum, prozent, menge } from '../public/ui/format.js';
+import { franken, datum, prozent, menge, text } from '../public/ui/format.js';
 
 describe('franken', () => {
   it('setzt Apostroph-Tausender und zwei Nachkommastellen', () => {
@@ -37,5 +37,15 @@ describe('prozent und menge', () => {
     expect(menge(33.5)).toBe('33.5');
     expect(menge(1)).toBe('1');
     expect(menge(0.25)).toBe('0.25');
+  });
+});
+
+describe('text', () => {
+  it('maskiert Sonderzeichen fuer die Verwendung in innerHTML', () => {
+    expect(text('Müller & Co. <script>')).toBe('Müller &amp; Co. &lt;script&gt;');
+  });
+  it('zeigt fehlende Werte als Leerstring', () => {
+    expect(text(null)).toBe('');
+    expect(text(undefined)).toBe('');
   });
 });
