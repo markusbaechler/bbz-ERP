@@ -1,4 +1,5 @@
 import type { AdressenErgebnis } from './adressen';
+import type { KontenErgebnis } from './konten';
 
 export type SummenVergleich = { csv: number; db: number | null; differenz: number | null; ok: boolean };
 
@@ -9,13 +10,20 @@ export type ImportReport = {
   projekteLauf: boolean;
   /** Nur gesetzt, wenn --adressen uebergeben wurde — sonst waechst kein leerer Abschnitt. */
   adressen: AdressenErgebnis | null;
+  /** Nur gesetzt, wenn --konten uebergeben wurde. */
+  kontenplan: KontenErgebnis | null;
   /** Gesetzt, wenn der Lauf genau einen Jahrgang betrifft — sonst null. */
   jahr: number | null;
   /** Alle Jahrgaenge, die dieser Lauf uebernommen hat, aufsteigend. */
   jahre: number[];
   auftraggeber: { gelesen: number; neu: number; aktualisiert: number; ohneAdresse: number };
   projekte: { gelesen: number; neu: number; aktualisiert: number; uebersprungen: number };
-  konten: { angelegt: number; vorhanden: number };
+  /**
+   * Konten in der Datenbank. Kein Ergebnis *dieses* Laufs mehr: Projekt- und
+   * Adressimport schreiben keine Konten, das tut allein `--konten`. 0 heisst, dass
+   * jede Kontierung offen bleibt.
+   */
+  kontenBestand: number | null;
   mwstSaetze: { angelegt: number; vorhanden: number };
   zaehler: {
     /** Wert, den *dieser* Lauf gesetzt hat — null, wenn er den Zaehler nicht angefasst hat. */
@@ -84,6 +92,28 @@ const zaehlerStandZeile = (z: ImportReport['zaehler']): string => {
 // Der Adress-Nachtrag muss fuer einen Menschen genau eine Frage beantworten: wer ist
 // jetzt fakturierbar und wer nicht. Darum die Trichter-Zahlen von der Datei bis zur
 // geschriebenen Adresse — und danach namentlich, wer weiterhin gesperrt ist.
+// Der Kontenplan ist die Quelle jeder Kontierung. Die Zahlen beantworten zwei Fragen:
+// wie viele Zeilen der Datei ueberhaupt Konten waren (der Rest sind Gruppen- und
+// Bannerzeilen des Excel-Blatts), und wie viele davon in der Datenbank stehen.
+const kontenAbschnitt = (k: KontenErgebnis): string[] => [
+  `## Kontenplan`,
+  ``,
+  `**Quelle:** \`${k.quelle}\` · **Modus:** ${k.modus}` +
+    (k.modus === 'dry-run' ? ' (nichts geschrieben — die Zahlen zeigen, was ein `--apply` taete)' : ''),
+  ``,
+  `| Kennzahl | Anzahl |`,
+  `|---|---:|`,
+  `| Zeilen in der Datei | ${k.zeilenGesamt} |`,
+  `| davon Konten (4- oder 5-stellige Nummer) | ${k.gelesen} |`,
+  `| Gruppen-, Banner- und Leerzeilen uebersprungen | ${k.uebersprungen} |`,
+  `| ${k.modus === 'apply' ? 'neu angelegt' : 'anzulegen'} | ${k.angelegt} |`,
+  `| ${k.modus === 'apply' ? 'aufgefrischt' : 'aufzufrischen'} | ${k.aktualisiert} |`,
+  `| davon Ertrag (3xxx) | ${k.ertrag} |`,
+  `| davon Aufwand (4xxx–9xxx) | ${k.aufwand} |`,
+  `| stillgelegt (\`aktiv = false\`) | ${k.inaktiv} |`,
+  ``,
+];
+
 const adressenAbschnitt = (a: AdressenErgebnis): string[] => [
   `## Adressen-Nachtrag`,
   ``,
@@ -131,7 +161,9 @@ export function formatReport(r: ImportReport): string {
       `|---|---:|---:|---:|---|`,
       `| Auftraggeber | ${r.auftraggeber.gelesen} | ${r.auftraggeber.neu} | ${r.auftraggeber.aktualisiert} | ${r.auftraggeber.ohneAdresse} ohne Adresse |`,
       `| Projekte | ${r.projekte.gelesen} | ${r.projekte.neu} | ${r.projekte.aktualisiert} | ${r.projekte.uebersprungen} uebersprungen |`,
-      `| Konten | ${r.konten.angelegt + r.konten.vorhanden} | ${r.konten.angelegt} | ${r.konten.vorhanden} | Kontenplan |`,
+      // Konten schreibt dieser Lauf keine — nur `--konten` tut das. Darum Bestand statt
+      // neu/aktualisiert; sonst stuenden hier Nullen, die wie ein Fehlschlag aussehen.
+      `| Konten | ${r.kontenBestand ?? '—'} | — | — | Bestand im Kontenplan${r.kontenBestand === 0 ? ' — **leer**, jede Kontierung bleibt offen' : ''} |`,
       `| MWSt-Saetze | ${r.mwstSaetze.angelegt + r.mwstSaetze.vorhanden} | ${r.mwstSaetze.angelegt} | ${r.mwstSaetze.vorhanden} | Satzhistorie |`,
       ``,
       `## Summenabgleich gegen FileMaker`,
@@ -143,6 +175,7 @@ export function formatReport(r: ImportReport): string {
       zeile('abgerechnet', r.summen.abgerechnet),
       ``,
     ]),
+    ...(r.kontenplan === null ? [] : kontenAbschnitt(r.kontenplan)),
     ...(r.adressen === null ? [] : adressenAbschnitt(r.adressen)),
     `## Rechnungszaehler`,
     ``,

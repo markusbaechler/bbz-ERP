@@ -1,17 +1,24 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getPool, closePool } from '../src/db/pool';
 import { resetDb } from './helpers/db';
 import { leseKonten, importKonten } from '../src/migration/konten';
+import { fuehreMigrationAus } from '../src/migration/run';
+import { formatReport } from '../src/migration/report';
+import { importStammdaten } from '../src/migration/stammdaten';
+import { KONTENPLAN_LEER_WARNUNG } from '../src/migration/projekte';
 import { findKontoByNummer, listKonten } from '../src/repos/kontoRepo';
+import { listProjekte } from '../src/repos/projektRepo';
 
 // Ausschnitt aus dem echten Kundenkontenplan ("Kontoplan 2024.xlsx", Blatt
 // Erfolgsrechnung): 15 Kontozeilen — genau die, die der Projekt-Export belegt —
 // plus die Gruppen-, Banner- und Leerzeilen, die dazwischenstehen. Die Bezeichnungen
 // sind unveraendert aus der Quelle uebernommen; nichts daran ist abgeleitet.
 const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/kontoplan_mini.csv');
+const projekte = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/projekte_mini.csv');
 const text = () => readFileSync(fixture, 'utf8');
 
 beforeAll(async () => { await resetDb(getPool()); });
@@ -140,4 +147,105 @@ describe('importKonten', () => {
     await importKonten(getPool(), { quelle: fixture, text: geaendert, modus: 'apply' });
     expect((await findKontoByNummer(getPool(), '3204'))?.bezeichnung).toBe('SAQ Zertifizierung neu');
   });
+});
+
+describe('--konten im Migrationslauf', () => {
+  it('laeuft allein, wie --adressen — ohne Projektdatei', async () => {
+    await resetDb(getPool());
+    const r = await fuehreMigrationAus(getPool(), { kontenCsv: fixture, modus: 'apply' });
+    expect(r.projekteLauf).toBe(false);
+    expect(r.kontenplan!.angelegt).toBe(15);
+    expect(await listKonten(getPool())).toHaveLength(15);
+
+    const md = formatReport(r);
+    expect(md).toContain('## Kontenplan');
+    expect(md).not.toContain('Summenabgleich');
+  });
+
+  it('schreibt im Dry-Run nichts und sagt, was ein Apply taete', async () => {
+    await resetDb(getPool());
+    const r = await fuehreMigrationAus(getPool(), { kontenCsv: fixture, modus: 'dry-run' });
+    expect(r.kontenplan!.angelegt).toBe(15);
+    expect(await listKonten(getPool())).toHaveLength(0);
+  });
+
+  // Die Reihenfolge ist keine Geschmacksfrage: die Projekte schlagen ihre Kontierung
+  // in der Datenbank nach. Laufen sie zuerst, findet keines sein Konto.
+  it('importiert in einem Lauf erst die Konten, dann die Projekte', async () => {
+    await resetDb(getPool());
+    const r = await fuehreMigrationAus(getPool(), { kontenCsv: fixture, projekteCsv: projekte, modus: 'apply' });
+    expect(r.kontenplan!.angelegt).toBe(15);
+    expect(r.projekte.neu).toBe(3);
+    expect(r.warnungen.filter((w) => w.includes('nicht im Kontenplan'))).toHaveLength(0);
+
+    const p = (await listProjekte(getPool(), { jahr: 2026 })).find((x) => x.nummer === '1285.26')!;
+    expect(p.ertragskontoId).toBe((await findKontoByNummer(getPool(), '3010'))!.id);
+  });
+
+  // Vorher wurden 151 gleichlautende Warnungen ausgeworfen, eine je Projekt. Der Grund
+  // ist aber genau einer, und er steht nicht am Projekt.
+  it('meldet einen leeren Kontenplan einmal statt einmal je Projekt', async () => {
+    await resetDb(getPool());
+    const r = await fuehreMigrationAus(getPool(), { projekteCsv: projekte, modus: 'apply' });
+    expect(r.warnungen.filter((w) => w === KONTENPLAN_LEER_WARNUNG)).toHaveLength(1);
+    expect(r.warnungen.filter((w) => w.includes('nicht im Kontenplan'))).toHaveLength(0);
+    expect(r.kontenBestand).toBe(0);
+  });
+
+  it('meldet den leeren Kontenplan im Dry-Run genauso', async () => {
+    await resetDb(getPool());
+    const dry = await fuehreMigrationAus(getPool(), { projekteCsv: projekte, modus: 'dry-run' });
+    const apply = await fuehreMigrationAus(getPool(), { projekteCsv: projekte, modus: 'apply' });
+    expect(dry.warnungen.filter((w) => w === KONTENPLAN_LEER_WARNUNG)).toHaveLength(1);
+    expect([...dry.warnungen].sort()).toEqual([...apply.warnungen].sort());
+  });
+
+  // Der erfundene KONTENPLAN in stammdaten.ts ist weg — die Migration erfindet keine
+  // Daten, auch keine Stammdaten. Uebrig bleibt allein die MWSt-Satzhistorie.
+  it('legt ohne --konten kein einziges Konto an', async () => {
+    await resetDb(getPool());
+    const r = await importStammdaten(getPool());
+    expect(r.mwstSaetze.angelegt).toBeGreaterThan(0);
+    expect(await listKonten(getPool())).toHaveLength(0);
+  });
+});
+
+// Wie in migrationAdressenCli.test.ts: der Einstiegspunkt wird wirklich gestartet,
+// sonst bleibt ein Windows-Pfadproblem im argv-Vergleich unbemerkt.
+const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+const env = { ...process.env, DATABASE_URL: process.env.DATABASE_URL ?? 'postgres://bbz:bbz@localhost:5433/bbz_test' };
+function laufe(...args: string[]): { code: number; aus: string } {
+  try {
+    const aus = execSync(['npx tsx src/migration/run.ts', ...args].join(' '), {
+      cwd: repo, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { code: 0, aus };
+  } catch (e: any) {
+    return { code: typeof e.status === 'number' ? e.status : 1, aus: `${e.stdout ?? ''}${e.stderr ?? ''}` };
+  }
+}
+
+describe('CLI --konten', () => {
+  it('nennt --konten in der Aufrufhilfe', () => {
+    const r = laufe();
+    expect(r.code).toBe(2);
+    expect(r.aus).toContain('--konten');
+  }, 60000);
+
+  it('laeuft mit --konten allein', async () => {
+    await resetDb(getPool());
+    const r = laufe(`--konten=${fixture}`, '--apply');
+    expect(r.code).toBe(0);
+    expect(r.aus).toContain('## Kontenplan');
+    expect(await listKonten(getPool())).toHaveLength(15);
+  }, 60000);
+
+  // Ein falsches Blatt (etwa die Bilanz statt der Erfolgsrechnung) hat keine Spalte
+  // "Nummer". Das muss ein Satz sein, kein Stacktrace.
+  it('meldet eine Datei ohne Kopfzeile "Nummer" sauber', () => {
+    const r = laufe('--konten=test/fixtures/projekte_mini.csv');
+    expect(r.code).toBe(2);
+    expect(r.aus).toContain('Nummer');
+    expect(r.aus).not.toContain('at ');
+  }, 60000);
 });

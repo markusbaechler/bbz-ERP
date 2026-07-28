@@ -2,13 +2,15 @@ import type pg from 'pg';
 import type { ProjektGruppe } from './gruppen';
 import type { MigrationProjektInput } from '../domain/types';
 import { fmText, fmZahl, fmProjektNummer, istProjektNummer, fmBereich } from './normalize';
-import { findKontoByNummer } from '../repos/kontoRepo';
+import { listKonten } from '../repos/kontoRepo';
 import { upsertProjektAusMigration, type ProjektSchluessel } from '../repos/projektRepo';
 
 export type Betragssummen = { budgetChf: number; offenProv: number; abgerechnet: number };
 
 export type ProjektImportErgebnis = {
   gelesen: number; neu: number; aktualisiert: number; uebersprungen: number;
+  /** Konten in der Datenbank zum Zeitpunkt des Laufs — 0 heisst: `--konten=` fehlt noch. */
+  kontenBestand: number;
   csvSummen: Betragssummen;
   /**
    * Je Kennzahl die Zahl der CSV-Betraege, die beim Schreiben als numeric(12,2)
@@ -56,10 +58,34 @@ export type ProjektPruefung = {
   warnungen: string[];
 };
 
-// Einheitlicher Text, damit Dry-Run (gegen KONTENPLAN) und Apply (gegen die DB)
-// dieselbe Warnung erzeugen.
+// Einheitlicher Text, damit Dry-Run und Apply dieselbe Warnung erzeugen. Beide pruefen
+// seit dem Wegfall der erfundenen Kontenliste gegen dieselbe Quelle: die Datenbank.
 export const kontoWarnung = (projektNr: string, feld: string, nummer: string): string =>
   `Projekt ${projektNr}: ${feld} "${nummer}" nicht im Kontenplan — Kontierung bleibt offen`;
+
+// Ist der Kontenplan gar nicht importiert, hat jedes Projekt dieselbe Ursache. Vorher
+// standen dafuer 151 gleichlautende Zeilen im Report; der Operator musste sie einzeln
+// lesen, um zu merken, dass ihm eine Datei fehlt. Jetzt steht es einmal da.
+export const KONTENPLAN_LEER_WARNUNG =
+  'Kontenplan nicht importiert — alle Kontierungen bleiben offen; zuerst `--konten=` laufen lassen ' +
+  '(npm run migrate:fm -- --konten=<pfad.csv> --apply)';
+
+/**
+ * Der Kontenplan aus der Datenbank, einmal je Lauf. Einzige Quelle der Kontierung —
+ * eine im Code hinterlegte Liste gibt es nicht mehr. Dry-Run und Apply rufen dieselbe
+ * Funktion, damit beide denselben Warnungssatz erzeugen; der Dry-Run liest damit die
+ * Datenbank (nur lesend, ueber src/repos) und schreibt weiterhin nichts.
+ */
+export async function ladeKontenplan(pool: pg.Pool): Promise<{
+  idNachNummer: Map<string, string>; bestand: number; warnungen: string[];
+}> {
+  const konten = await listKonten(pool);
+  return {
+    idNachNummer: new Map(konten.map((k) => [k.nummer, k.id])),
+    bestand: konten.length,
+    warnungen: konten.length === 0 ? [KONTENPLAN_LEER_WARNUNG] : [],
+  };
+}
 
 // Alle Pruefungen eines importierbaren Projekts, die ohne Datenbank auskommen.
 // Apply-Import und Dry-Run-Vorschau rufen dieselbe Funktion, damit beide Modi
@@ -141,23 +167,22 @@ export async function importProjekte(
   gruppen: ProjektGruppe[],
   idNachNummer: Map<string, string>,
 ): Promise<ProjektImportErgebnis> {
+  // Kontenplan einmal je Lauf, nicht je Kontonummer: die Datenbank fuehrt 177 Konten,
+  // die passen in eine Map.
+  const kontenplan = await ladeKontenplan(pool);
   const e: ProjektImportErgebnis = {
     gelesen: gruppen.length, neu: 0, aktualisiert: 0, uebersprungen: 0,
+    kontenBestand: kontenplan.bestand,
     csvSummen: { budgetChf: 0, offenProv: 0, abgerechnet: 0 },
     csvGerundet: { budgetChf: 0, offenProv: 0, abgerechnet: 0 },
-    schluessel: [], warnungen: doppelteProjektNummern(gruppen),
+    schluessel: [], warnungen: [...doppelteProjektNummern(gruppen), ...kontenplan.warnungen],
   };
   const auftraggeberNummern = new Set(idNachNummer.keys());
-  // Kontonummer -> id (oder null fuer "nicht im Kontenplan"), einmal je Lauf aufgeloest
-  const kontoCache = new Map<string, string | null>();
-  const kontoId = async (nummer: string | null, projektNr: string, feld: string): Promise<string | null> => {
+  const kontoId = (nummer: string | null, projektNr: string, feld: string): string | null => {
     if (nummer === null) return null;
-    if (!kontoCache.has(nummer)) {
-      const k = await findKontoByNummer(pool, nummer);
-      kontoCache.set(nummer, k?.id ?? null);
-    }
-    const id = kontoCache.get(nummer)!;
-    if (id === null) e.warnungen.push(kontoWarnung(projektNr, feld, nummer));
+    const id = kontenplan.idNachNummer.get(nummer) ?? null;
+    // Bei leerem Kontenplan steht der Grund schon einmal oben — nicht noch einmal je Projekt.
+    if (id === null && kontenplan.bestand > 0) e.warnungen.push(kontoWarnung(projektNr, feld, nummer));
     return id;
   };
 
@@ -182,8 +207,8 @@ export async function importProjekte(
       bereich: fmBereich(p['Bereich']),
       beschrieb: fmText(p['Beschrieb']),
       ansprechperson: fmText(p['Ansprechperson']),
-      ertragskontoId: await kontoId(fmText(p['Konto']), projektNr, 'Konto'),
-      aufwandKontoId: await kontoId(fmText(p['Aufw. Konto']), projektNr, 'Aufw. Konto'),
+      ertragskontoId: kontoId(fmText(p['Konto']), projektNr, 'Konto'),
+      aufwandKontoId: kontoId(fmText(p['Aufw. Konto']), projektNr, 'Aufw. Konto'),
       budgetChf, budgetTage: zahlen.budgetTage,
       aufwandBudgetChf: zahlen.aufwandBudgetChf,
       fmOffenProv: offenProv, fmAbgerechnet: abgerechnet,

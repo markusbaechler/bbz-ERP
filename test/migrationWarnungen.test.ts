@@ -1,20 +1,36 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { getPool, closePool } from '../src/db/pool';
 import { resetDb } from './helpers/db';
 import { fuehreMigrationAus } from '../src/migration/run';
+import { importKonten } from '../src/migration/konten';
 import { formatReport } from '../src/migration/report';
 
 // Fixture mit genau den Faellen, die frueher stillschweigend durchgingen:
 // 3001.26 — unlesbare Betraege (Budget CHF/Budget Tage/Aufw. Budget CHF/offen_prov.),
-//           unbekanntes Konto 31001, nicht erkanntes MWSt "netto"
+//           unbekanntes Konto 39999, nicht erkanntes MWSt "netto"
 // 3002.25 — Spalte Jahr=2026 gegen Nummer .25, zweite Ansprechperson zur Nr. 701
+//
+// Hier stand frueher 31001 als "unbekanntes Konto". Das war ein Irrtum: der echte
+// Kontenplan fuehrt 31001 sehr wohl ("Ausbildung von Lernenden 7.7%", die
+// MWSt-Variante zu 3100). Fuer den Fall "Nummer steht nicht im Kontenplan" braucht es
+// eine Nummer, die es wirklich nicht gibt — 39999.
 const warnFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/projekte_warnungen.csv');
+const kontenFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/kontoplan_mini.csv');
 
 const sortiert = (ws: string[]) => [...ws].sort();
 
-beforeAll(async () => { await resetDb(getPool()); });
+beforeAll(async () => {
+  await resetDb(getPool());
+  // Ohne Kontenplan meldet der Import einen einzigen Satz ("Kontenplan nicht
+  // importiert") statt einer Warnung je Projekt — dann waere hier gar keine
+  // Kontierungs-Warnung zu pruefen.
+  await importKonten(getPool(), {
+    quelle: kontenFixture, text: readFileSync(kontenFixture, 'utf8'), modus: 'apply',
+  });
+});
 afterAll(async () => { await closePool(); });
 
 describe('Warnungen im Import', () => {
@@ -75,9 +91,12 @@ describe('Warnungen im Import', () => {
     expect(dry.datenbefunde.length).toBeGreaterThanOrEqual(1);
   });
 
+  // Frueher pruefte der Dry-Run gegen eine im Code hinterlegte Kontenliste und konnte
+  // darum andere Kontierungs-Warnungen melden als der Apply-Lauf. Die Liste ist weg;
+  // beide pruefen jetzt gegen dieselbe Quelle, und der Hinweis sagt welche.
   it('sagt im Dry-Run, wogegen die Kontenpruefung laeuft', async () => {
     const dry = await fuehreMigrationAus(getPool(), { projekteCsv: warnFixture, modus: 'dry-run' });
-    expect(dry.hinweise.join(' ')).toContain('KONTENPLAN');
-    expect(formatReport(dry)).toContain('KONTENPLAN');
+    expect(dry.hinweise.join(' ')).toContain('Kontenplan aus der Datenbank');
+    expect(formatReport(dry)).toContain('Kontenplan aus der Datenbank');
   });
 });

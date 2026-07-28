@@ -1,29 +1,29 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getPool, closePool } from '../src/db/pool';
 import { resetDb } from './helpers/db';
-import { importStammdaten, KONTENPLAN, MWST_SAETZE } from '../src/migration/stammdaten';
-import { findKontoByNummer, listKonten } from '../src/repos/kontoRepo';
+import { importStammdaten, MWST_SAETZE } from '../src/migration/stammdaten';
+import { listKonten } from '../src/repos/kontoRepo';
 import { findGueltigenSatz } from '../src/repos/mwstSatzRepo';
 
 beforeAll(async () => { await resetDb(getPool()); });
 afterAll(async () => { await closePool(); });
 
 describe('importStammdaten', () => {
-  it('legt Kontenplan und Satzhistorie an', async () => {
+  // Frueher legte importStammdaten zusaetzlich elf Konten an, deren Bezeichnungen aus
+  // der Bereichs-Spalte des Projekt-Exports abgeleitet waren. Diese Liste ist weg — die
+  // Migration erfindet keine Stammdaten. Der Kontenplan kommt jetzt aus der Datei des
+  // Kunden, ueber --konten (siehe migrationKonten.test.ts).
+  it('legt die Satzhistorie an und kein einziges Konto', async () => {
     const r = await importStammdaten(getPool());
-    expect(r.konten.angelegt).toBe(KONTENPLAN.length);
     expect(r.mwstSaetze.angelegt).toBe(MWST_SAETZE.length);
-    expect((await findKontoByNummer(getPool(), '3100'))?.typ).toBe('Ertrag');
-    expect((await findKontoByNummer(getPool(), '5000'))?.typ).toBe('Aufwand');
-    expect(await listKonten(getPool())).toHaveLength(KONTENPLAN.length);
+    expect(await listKonten(getPool())).toHaveLength(0);
   });
 
   it('ist beim zweiten Lauf idempotent', async () => {
     const r = await importStammdaten(getPool());
-    expect(r.konten.angelegt).toBe(0);
-    expect(r.konten.vorhanden).toBe(KONTENPLAN.length);
     expect(r.mwstSaetze.angelegt).toBe(0);
-    expect(await listKonten(getPool())).toHaveLength(KONTENPLAN.length);
+    expect(r.mwstSaetze.vorhanden).toBe(MWST_SAETZE.length);
+    expect(await listKonten(getPool())).toHaveLength(0);
   });
 
   it('deckt alle im Export vorkommenden MWSt-Saetze zum passenden Datum ab', async () => {

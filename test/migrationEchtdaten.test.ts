@@ -7,17 +7,80 @@ import { resetDb } from './helpers/db';
 import { fuehreMigrationAus } from '../src/migration/run';
 import { findAuftraggeberByNummer, listAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { listProjekte } from '../src/repos/projektRepo';
+import { listKonten, findKontoByNummer } from '../src/repos/kontoRepo';
 import { createRechnung, addPosition, festschreiben } from '../src/repos/rechnungRepo';
 import { setzeRechnungZaehler } from '../src/repos/zaehlerRepo';
 
 // Liegt ausserhalb des Repos (Personen-/Bankdaten werden nicht eingecheckt).
 const echt = join(dirname(fileURLToPath(import.meta.url)), '../../fm-discovery/export/export_daten.csv');
 const echtAdressen = join(dirname(fileURLToPath(import.meta.url)), '../../fm-discovery/export/adressen_export.csv');
+// Blatt "Erfolgsrechnung" aus "Kontoplan 2024.xlsx" des Kunden.
+const echtKonten = join(dirname(fileURLToPath(import.meta.url)), '../../fm-discovery/info/kontoplan_erfolgsrechnung.csv');
 const vorhanden = existsSync(echt);
 const adressenVorhanden = existsSync(echtAdressen);
+const kontenVorhanden = existsSync(echtKonten);
+
+// Die 15 Kontonummern, die der Projekt-Export wirklich belegt — inklusive der vier
+// fuenfstelligen MWSt-Varianten, die vor dem echten Kontenplan als unaufloesbar galten.
+const BELEGTE_KONTEN = [
+  '3010', '3011', '3100', '3101', '3102', '3200', '3204', '3700',
+  '31001', '31021', '32001', '32041', '5000', '5100', '5200',
+];
 
 beforeAll(async () => { if (vorhanden) await resetDb(getPool()); });
 afterAll(async () => { await closePool(); });
+
+describe.skipIf(!kontenVorhanden)('Kontenplan gegen die echte Datei', () => {
+  it('importiert 177 Konten aus 254 Zeilen und ueberspringt die Gruppenzeilen', async () => {
+    const r = await fuehreMigrationAus(getPool(), { kontenCsv: echtKonten, modus: 'apply' });
+    const k = r.kontenplan!;
+    expect(k.zeilenGesamt).toBe(254);
+    expect(k.gelesen).toBe(177);
+    expect(k.uebersprungen).toBe(77);
+    expect(k.angelegt).toBe(177);
+    expect(k.ertrag).toBe(60);         // 3xxx
+    expect(k.aufwand).toBe(117);       // 4xxx-9xxx
+    expect(k.inaktiv).toBe(0);         // der Stand 2024 fuehrt kein stillgelegtes Konto
+    expect(k.warnungen).toEqual([]);
+    expect(await listKonten(getPool())).toHaveLength(177);
+  });
+
+  // Der Kern des Ganzen: die Bezeichnungen sind jetzt die des Kunden, nicht die aus
+  // der Bereichs-Spalte abgeleiteten. Die Stichprobe nennt die vier Faelle, in denen
+  // die abgeleitete Bezeichnung nachweislich falsch war.
+  it('traegt die Bezeichnungen des Kunden statt der abgeleiteten', async () => {
+    const b = async (n: string) => (await findKontoByNummer(getPool(), n))?.bezeichnung;
+    expect(await b('3100')).toBe('Ausbildung von Lernenden');        // war "Ertrag Banking"
+    expect(await b('3101')).toBe('Grundbildung');                    // war "Ertrag Kundenberaterausbildung"
+    expect(await b('3102')).toBe('Weiterentwicklung');               // war "Ertrag Banking (weitere)"
+    expect(await b('3200')).toBe('B+V / Zertifizierungen ohne SAQ'); // war "Ertrag Lizenzierung"
+    expect(await b('5200')).toBe('Externe Zertifizierung 0.0%');     // war "Uebriger Projektaufwand"
+  });
+
+  // Eine angehaengte 1 ergibt den Zwilling fuer die andere MWSt-Behandlung. Die vier
+  // Nummern galten als Fehler im Export; sie sind keiner.
+  it('kennt alle vier fuenfstelligen MWSt-Varianten', async () => {
+    const k = async (n: string) => await findKontoByNummer(getPool(), n);
+    expect((await k('31001'))?.bezeichnung).toBe('Ausbildung von Lernenden 7.7%');
+    expect((await k('31001'))?.mwstCode).toBe('510');
+    expect((await k('31021'))?.bezeichnung).toBe('Weiterentwicklung 7.7%');
+    expect((await k('32001'))?.bezeichnung).toBe('Beratungs- und Verkaufsprozesse 0%');
+    expect((await k('32001'))?.mwstCode).toBe('U00');
+    expect((await k('32041'))?.bezeichnung).toBe('Lizenzschulung 0%');
+  });
+
+  it('deckt alle 15 vom Projekt-Export belegten Konten ab', async () => {
+    const bestand = new Set((await listKonten(getPool())).map((x) => x.nummer));
+    expect(BELEGTE_KONTEN.filter((n) => !bestand.has(n))).toEqual([]);
+  });
+
+  it('ist beim zweiten Lauf idempotent', async () => {
+    const r = await fuehreMigrationAus(getPool(), { kontenCsv: echtKonten, modus: 'apply' });
+    expect(r.kontenplan!.angelegt).toBe(0);
+    expect(r.kontenplan!.aktualisiert).toBe(177);
+    expect(await listKonten(getPool())).toHaveLength(177);
+  });
+});
 
 describe.skipIf(!vorhanden)('Migration gegen den echten Projekt-Export', () => {
   it('importiert 151 Projekte und 49 Auftraggeber mit passenden Summen', async () => {
@@ -38,9 +101,31 @@ describe.skipIf(!vorhanden)('Migration gegen den echten Projekt-Export', () => {
     expect(r.summen.offenProv.ok).toBe(true);
     expect(r.summen.abgerechnet.ok).toBe(true);
 
-    // Bekannte, erwartete Datenluecken (Befunde B3/B4)
+    // Bekannte, erwartete Datenluecke (Befund B3): der Projekt-Export fuehrt keine Adressen.
     expect(r.auftraggeber.ohneAdresse).toBe(49);
-    expect(r.warnungen.filter((w) => w.includes('nicht im Kontenplan')).length).toBeGreaterThan(0);
+
+    // Befund B4 ist erledigt. Vorher: 9 Warnungen "Konto nicht im Kontenplan", alle
+    // zu den fuenfstelligen MWSt-Varianten (31001 x1, 31021 x5, 32001 x1, 32041 x2).
+    // Der echte Kontenplan kennt sie — es bleibt keine einzige uebrig.
+    expect(r.kontenBestand).toBe(177);
+    expect(r.warnungen.filter((w) => w.includes('nicht im Kontenplan'))).toEqual([]);
+  });
+
+  // Der Gegenbeweis am Datensatz, nicht nur an der Warnungszahl: die 9 Projekte, die
+  // vorher ohne Kontierung ankamen, tragen jetzt ihr Ertragskonto.
+  it('kontiert auch die 9 Projekte mit fuenfstelliger Kontonummer', async () => {
+    const projekte = await listProjekte(getPool(), { jahr: 2026 });
+    expect(projekte).toHaveLength(151);
+    // 149 der 151 Zeilen fuehren ueberhaupt eine Kontonummer; bei zweien ist das Feld
+    // im Export leer — die bleiben zu Recht ohne Kontierung.
+    expect(projekte.filter((p) => p.ertragskontoId !== null)).toHaveLength(149);
+
+    const fuenfstellig = new Map<string, string>();
+    for (const n of ['31001', '31021', '32001', '32041']) {
+      fuenfstellig.set((await findKontoByNummer(getPool(), n))!.id, n);
+    }
+    const daran = projekte.filter((p) => fuenfstellig.has(p.ertragskontoId!));
+    expect(daran).toHaveLength(9);
   });
 
   it('ist beim zweiten Lauf idempotent', async () => {
