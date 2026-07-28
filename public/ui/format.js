@@ -12,6 +12,10 @@ export function franken(n) {
   return CHF.format(n);
 }
 
+// Erwartet genau `YYYY-MM-DD` und gibt sonst einen Gedankenstrich aus. Dass die
+// API dieses Format liefert, haengt am DATE-Typparser in src/db/pool.ts — ohne
+// ihn kaeme ein ISO-Zeitstempel, und jedes Datum in der Oberflaeche wuerde
+// stillschweigend zu „—".
 export function datum(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
   return m ? `${m[3]}.${m[2]}.${m[1]}` : '—';
