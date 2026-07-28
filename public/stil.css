@@ -1,0 +1,65 @@
+:root {
+  --papier:     #FAFAF8;  /* Grundflaeche */
+  --tinte:      #14181D;  /* Text, blauschwarz */
+  --tinte-matt: #5A6470;  /* Sekundaertext */
+  --linie:      #D9DCE0;  /* Trennlinien */
+  --marke:      #1F4E79;  /* einzige Akzentfarbe: Fokus, Primaeraktion */
+  --offen:      #8A5A00;  /* Status abgerechnet/offen (Ocker) */
+  --bezahlt:    #1E6B4F;  /* Status bezahlt */
+  --storno:     #9B2226;  /* Storno UND negative Betraege — sonst nie */
+
+  --schrift:    -apple-system, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --code:       "Cascadia Mono", Consolas, ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--papier); color: var(--tinte); font-family: var(--schrift); font-size: 14px; line-height: 1.45; }
+.kopf { display: flex; gap: 1.5rem; align-items: baseline; padding: .6rem 1rem; border-bottom: 1px solid var(--linie); }
+.marke { font-weight: 600; text-decoration: none; color: var(--tinte); }
+.kopf nav a { margin-right: 1rem; color: var(--tinte-matt); text-decoration: none; }
+.kopf nav a:hover { color: var(--marke); }
+main { padding: 1rem; }
+
+/* Bezeichner sind Codes */
+.code, td.code { font-family: var(--code); font-variant-numeric: tabular-nums; }
+/* Projektnummer als Titel — die Nummer ist der Name, unter dem gesprochen wird */
+.titel-nummer { font-family: var(--code); font-size: 2rem; letter-spacing: -.02em; margin: 0; }
+.titel-name { font-size: 1.05rem; color: var(--tinte-matt); margin: .1rem 0 1rem; }
+
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: .3rem .6rem; border-bottom: 1px solid var(--linie); text-align: left; }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--tinte-matt); font-weight: 600; cursor: pointer; }
+td.betrag, th.betrag { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--code); }
+td.betrag.minus { color: var(--storno); }
+tbody tr:hover { background: #F0F2F4; }
+
+.status { font-size: .78rem; font-weight: 600; }
+.status-offen_prov { color: var(--tinte-matt); }
+.status-def_vereinbart { color: var(--marke); }
+.status-abgerechnet { color: var(--offen); }
+.status-bezahlt { color: var(--bezahlt); }
+.status-storniert { color: var(--storno); text-decoration: line-through; }
+
+/* Eckmarken: Signatur aus dem QR-Zahlteil — markieren ausschliesslich Eingabefelder */
+.eck { position: relative; display: inline-block; padding: 2px; }
+.eck > input, .eck > select { border: 0; background: transparent; font: inherit; color: inherit; padding: .25rem .35rem; }
+.eck::before, .eck::after {
+  content: ""; position: absolute; width: 7px; height: 7px; pointer-events: none;
+  border-color: var(--tinte-matt); border-style: solid;
+}
+.eck::before { top: 0; left: 0; border-width: 1px 0 0 1px; }
+.eck::after  { bottom: 0; right: 0; border-width: 0 1px 1px 0; }
+.eck:focus-within::before, .eck:focus-within::after { border-color: var(--marke); border-width: 2px; }
+.eck.fehlerhaft::before, .eck.fehlerhaft::after { border-color: var(--storno); }
+
+button { font: inherit; padding: .35rem .8rem; border: 1px solid var(--linie); background: #fff; color: var(--tinte); cursor: pointer; }
+button:hover { border-color: var(--marke); color: var(--marke); }
+button.haupt { background: var(--marke); border-color: var(--marke); color: #fff; }
+button[disabled] { opacity: .5; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--marke); outline-offset: 2px; }
+
+#fehlerbanner, #sperrstreifen { padding: .5rem 1rem; font-size: .9rem; }
+#fehlerbanner { background: #FBEAEA; color: var(--storno); border-bottom: 1px solid var(--storno); }
+#sperrstreifen { background: #FBF3E3; color: var(--offen); border-bottom: 1px solid var(--offen); }
+.hinweis-fm { font-size: .78rem; color: var(--tinte-matt); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

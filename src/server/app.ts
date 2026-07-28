@@ -1,4 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyStatic from '@fastify/static';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type pg from 'pg';
 import { requireAdmin } from './auth';
 import { registerAuftraggeberRoutes } from './routes/auftraggeber';
@@ -21,5 +24,11 @@ export function buildApp(pool: pg.Pool): FastifyInstance {
   registerRechnungRoutes(app, pool);
   registerDebitorRoutes(app, pool);
   registerZaehlerRoutes(app, pool);
+  // Nach den API-Routen registriert, damit diese Vorrang vor gleichnamigen
+  // Dateien in public/ behalten.
+  app.register(fastifyStatic, {
+    root: join(dirname(fileURLToPath(import.meta.url)), '../../public'),
+    prefix: '/',
+  });
   return app;
 }
