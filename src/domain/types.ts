@@ -46,6 +46,26 @@ export type OffenerPosten = {
   totalBrutto: number; bezahlt: number; offen: number;
 };
 
+export type ProjektListenZeile = {
+  id: string; nummer: string; jahr: number; name: string; bereich: string | null;
+  auftraggeberId: string; auftraggeberName: string;
+  budgetChf: number | null; fmAbgerechnet: number | null; fmOffenProv: number | null;
+};
+
+export type ProjektDetail = Projekt & {
+  auftraggeberName: string; auftraggeberZusatz: string | null;
+  auftraggeberStrasse: string; auftraggeberPlz: string; auftraggeberOrt: string; auftraggeberLand: string;
+  auftraggeberAdresseUnvollstaendig: boolean;
+  ansprechperson: string | null; beschrieb: string | null; projektleitungKuerzel: string | null;
+  alteProjektNr: string | null; aufwandBudgetChf: number | null;
+  ertragskontoNummer: string | null; ertragskontoBezeichnung: string | null; aufwandKontoNummer: string | null;
+  fmAbgerechnet: number | null; fmOffenProv: number | null;
+};
+
+export type RechnungListenZeile = {
+  id: string; nummer: string | null; datum: string; status: RechnungStatus; totalBrutto: number;
+};
+
 export type MigrationProjektInput = {
   stammnummer: number; jahr: number; name: string; auftraggeberId: string;
   kuerzel: string | null; bereich: string | null; beschrieb: string | null; ansprechperson: string | null;
