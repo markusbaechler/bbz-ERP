@@ -48,16 +48,47 @@ export async function recalcTotale(pool: pg.Pool, rechnungId: string): Promise<R
   return mapR(upd.rows[0]);
 }
 
+// Menge und Einzelpreis liegen als numeric(12,2) in der Datenbank (Migration 005).
+// Wird mehr Genauigkeit hereingereicht, rundet Postgres beim Insert still — der
+// Betrag waere dann aus anderen Zahlen gerechnet als die, die gespeichert und auf
+// dem Beleg gedruckt werden: 33.555 x 230.00 = 7717.65, gespeichert aber
+// 33.56 x 230.00 = 7718.80. Die Zeile widerspraeche sich selbst.
+//
+// Abgewiesen statt gerundet: die Rechnung ist nach der Festschreibung
+// unwiderruflich, und bei einem Einzelpreis wie 0.085 (5000 Kopien) waere die
+// Rundung auf 0.09 kein Rundungsfehler mehr, sondern 6 % Mehrbetrag. Welcher der
+// beiden darstellbaren Werte gemeint ist, entscheidet der Mensch — nicht wir.
+function pruefeBetragsZahl(feld: string, wert: unknown): number {
+  if (typeof wert !== 'number' || !Number.isFinite(wert)) {
+    throw new ValidationError(`Feld ${feld} muss eine Zahl sein`);
+  }
+  if (wert <= 0) throw new ValidationError(`Feld ${feld} muss groesser als 0 sein`);
+  const s = String(wert);
+  const punkt = s.indexOf('.');
+  if (s.includes('e') || (punkt >= 0 && s.length - punkt - 1 > 2)) {
+    throw new ValidationError(
+      `Feld ${feld} darf hoechstens zwei Nachkommastellen haben (${s} ist so nicht speicherbar)`);
+  }
+  return wert;
+}
+
 export async function addPosition(pool: pg.Pool, rechnungId: string, p: { beschreibung: string; menge: number; einheit?: string; einzelpreis: number; mwstSatz: number; kontoId?: string | null }): Promise<Rechnungsposition> {
   const rechnung = await getRechnung(pool, rechnungId);
   if (rechnung.status !== 'offen_prov' && rechnung.status !== 'def_vereinbart') {
     throw new ValidationError(`Positionen nur im Entwurf editierbar (Status ${rechnung.status})`);
   }
-  const betragNetto = rappenRunden(p.menge * p.einzelpreis);
+  const beschreibung = String(p.beschreibung ?? '').trim();
+  if (!beschreibung) throw new ValidationError('Feld beschreibung ist Pflicht');
+  const menge = pruefeBetragsZahl('menge', p.menge);
+  const einzelpreis = pruefeBetragsZahl('einzelpreis', p.einzelpreis);
+  if (typeof p.mwstSatz !== 'number' || !Number.isFinite(p.mwstSatz) || p.mwstSatz < 0) {
+    throw new ValidationError('Feld mwstSatz muss eine nicht-negative Zahl sein');
+  }
+  const betragNetto = rappenRunden(menge * einzelpreis);
   const r = await pool.query(
     `insert into rechnungsposition(rechnung_id,position,beschreibung,menge,einheit,einzelpreis,mwst_satz,konto_id,betrag_netto)
      values ($1,(select coalesce(max(position),0)+1 from rechnungsposition where rechnung_id=$1),$2,$3,coalesce($4,'Pauschal'),$5,$6,$7,$8) returning *`,
-    [rechnungId, p.beschreibung, p.menge, p.einheit ?? null, p.einzelpreis, p.mwstSatz, p.kontoId ?? null, betragNetto]);
+    [rechnungId, beschreibung, menge, p.einheit ?? null, einzelpreis, p.mwstSatz, p.kontoId ?? null, betragNetto]);
   await recalcTotale(pool, rechnungId);
   return mapP(r.rows[0]);
 }
