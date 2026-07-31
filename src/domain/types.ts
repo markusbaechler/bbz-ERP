@@ -1,4 +1,8 @@
-export type Konto = { id: string; nummer: string; bezeichnung: string; typ: 'Ertrag' | 'Aufwand'; aktiv: boolean };
+export type Konto = {
+  id: string; nummer: string; bezeichnung: string; typ: 'Ertrag' | 'Aufwand'; aktiv: boolean;
+  /** MWSt-Behandlung aus dem Kontenplan des Kunden (510, 700, U00, ...) — roh, nicht ausgelegt. */
+  mwstCode: string | null;
+};
 
 export type MwstSatz = { id: string; satz: number; bezeichnung: string; gueltigAb: string; gueltigBis: string | null };
 

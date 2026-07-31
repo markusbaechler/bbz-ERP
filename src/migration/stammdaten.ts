@@ -1,23 +1,16 @@
 import type pg from 'pg';
-import { upsertKonto } from '../repos/kontoRepo';
 import { upsertMwstSatz } from '../repos/mwstSatzRepo';
 
-// Die im Projekt-Export belegten Konten (Befund B4).
-// ACHTUNG: Die Bezeichnungen sind aus der Bereichs-Zuordnung des Exports abgeleitet
-// und vor dem produktiven Lauf gegen den bbz-Kontenplan zu bestaetigen.
-export const KONTENPLAN = [
-  { nummer: '3010', bezeichnung: 'Ertrag Managementausbildung/IGK', typ: 'Ertrag' },
-  { nummer: '3011', bezeichnung: 'Ertrag Leadership/Unternehmensentwicklung', typ: 'Ertrag' },
-  { nummer: '3100', bezeichnung: 'Ertrag Banking', typ: 'Ertrag' },
-  { nummer: '3101', bezeichnung: 'Ertrag Kundenberaterausbildung', typ: 'Ertrag' },
-  { nummer: '3102', bezeichnung: 'Ertrag Banking (weitere)', typ: 'Ertrag' },
-  { nummer: '3200', bezeichnung: 'Ertrag Lizenzierung', typ: 'Ertrag' },
-  { nummer: '3204', bezeichnung: 'Ertrag Lizenzierung (weitere)', typ: 'Ertrag' },
-  { nummer: '3700', bezeichnung: 'Uebriger Ertrag', typ: 'Ertrag' },
-  { nummer: '5000', bezeichnung: 'Direkter Projektaufwand', typ: 'Aufwand' },
-  { nummer: '5100', bezeichnung: 'Referentenaufwand', typ: 'Aufwand' },
-  { nummer: '5200', bezeichnung: 'Uebriger Projektaufwand', typ: 'Aufwand' },
-] as const satisfies ReadonlyArray<{ nummer: string; bezeichnung: string; typ: 'Ertrag' | 'Aufwand' }>;
+// Hier stand bis zum Kontenplan-Import eine Liste von elf Konten, deren Bezeichnungen
+// aus der Bereichs-Spalte des Projekt-Exports abgeleitet — also erfunden — waren. Sie
+// ist ersatzlos weg: die Migration erfindet keine Daten, und das gilt fuer Stammdaten
+// genauso wie fuer Bewegungsdaten. Der echte Kontenplan kommt aus der Datei des Kunden
+// ("Kontoplan 2024.xlsx") und wird ueber `--konten=<pfad.csv>` importiert
+// (src/migration/konten.ts). Ohne diesen Lauf bleibt jede Kontierung offen — und der
+// Report sagt das in einem Satz, statt es je Projekt zu wiederholen.
+//
+// Uebrig bleibt die MWSt-Satzhistorie: die ist extern nachpruefbar (ESTV) und
+// unveraendert.
 
 // Schweizer MWSt-Satzhistorie. Deckt alle 12 im Faktura-Export vorkommenden Saetze ab
 // (0, 2, 2.4, 2.5, 2.6, 3.6, 3.7, 3.8, 7.6, 7.7, 8, 8.1) — noetig, damit historische
@@ -39,18 +32,12 @@ export const MWST_SAETZE = [
 ] as const satisfies ReadonlyArray<{ satz: number; bezeichnung: string; gueltigAb: string; gueltigBis: string | null }>;
 
 export async function importStammdaten(pool: pg.Pool): Promise<{
-  konten: { angelegt: number; vorhanden: number };
   mwstSaetze: { angelegt: number; vorhanden: number };
 }> {
-  const konten = { angelegt: 0, vorhanden: 0 };
-  for (const k of KONTENPLAN) {
-    const r = await upsertKonto(pool, { nummer: k.nummer, bezeichnung: k.bezeichnung, typ: k.typ });
-    r.neu ? konten.angelegt++ : konten.vorhanden++;
-  }
   const mwstSaetze = { angelegt: 0, vorhanden: 0 };
   for (const s of MWST_SAETZE) {
     const r = await upsertMwstSatz(pool, s);
     r.neu ? mwstSaetze.angelegt++ : mwstSaetze.vorhanden++;
   }
-  return { konten, mwstSaetze };
+  return { mwstSaetze };
 }

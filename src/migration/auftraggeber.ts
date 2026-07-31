@@ -17,7 +17,7 @@ export type AuftraggeberEintrag = { name: string; zusatz: string | null; ansprec
 // FileMaker-Freitext enthaelt doppelte und uneinheitliche Leerzeichen. "Alexander  Facchinetti"
 // und "Alexander Facchinetti" sind dieselbe Person; auf dem Rohstring verglichen waeren es zwei
 // — und das waere der erste Eintrag, den ein Operator im Report des echten Exports sieht.
-const wortabstand = (s: string): string => s.replace(/\s+/g, ' ').trim();
+export const wortabstand = (s: string): string => s.replace(/\s+/g, ' ').trim();
 
 // Reine CSV-Auswertung, ohne DB-Zugriff: welche Auftraggeber-Nummern haben ueberhaupt
 // einen Namen und sind damit importierbar? Wird sowohl vom Apply-Import (unten) als auch

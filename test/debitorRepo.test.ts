@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getPool, closePool } from '../src/db/pool';
 import { resetDb } from './helpers/db';
+import { setzeRechnungZaehler } from '../src/repos/zaehlerRepo';
 import { createAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { createProjekt } from '../src/repos/projektRepo';
 import { createRechnung, addPosition, festschreiben, getRechnung } from '../src/repos/rechnungRepo';
@@ -10,6 +11,10 @@ import { ValidationError } from '../src/domain/errors';
 let auftraggeberId: string; let projektId: string;
 beforeAll(async () => {
   await resetDb(getPool());
+  // Ausgangslage wie nach einem echten Deployment: der Zaehler steht auf dem aus
+  // FileMaker abgelesenen Hoechststand. Ohne das blockt die Untergrenze jede
+  // Festschreibung (src/config/rechnungszaehler.ts) — geprueft in zaehlerSperre.test.ts.
+  await setzeRechnungZaehler(getPool(), 33214);
   auftraggeberId = (await createAuftraggeber(getPool(), { name: 'Urner KB', strasse: 'Bahnhofstr. 1', plz: '6460', ort: 'Altdorf' })).id;
   projektId = (await createProjekt(getPool(), { stammnummer: 6231, jahr: 2026, name: 'Test', auftraggeberId })).id;
 });

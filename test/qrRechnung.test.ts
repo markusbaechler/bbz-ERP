@@ -27,4 +27,24 @@ describe('baueQrDaten', () => {
   it('verweigert nicht festgeschriebene Rechnung', () => {
     expect(() => baueQrDaten({ ...rechnung, lfdNr: null }, auftraggeber)).toThrow(ValidationError);
   });
+
+  it('laesst zusatz bewusst aus dem Debitor-Feld des QR-Zahlteils weg (nur der Brief traegt ihn)', () => {
+    // Das QR-Debitorfeld "name" ist auf 70 Zeichen begrenzt und kennt keine eigene
+    // Zusatzzeile (anders als der Adressblock im Brief). Ein Zusammenfuegen von
+    // Name und Zusatz wuerde bei anderen Auftraggebern unvorhersehbar an dieser
+    // Grenze scheitern (swissqrbill wirft dann einen Validierungsfehler) - fuer
+    // einen Zahlteil, den die Bank zur Zahlungsverarbeitung nutzt, nicht zur
+    // Postzustellung. Die Zustellung haengt am Brief, der die Zusatzzeile bereits
+    // separat druckt (siehe rechnungPdf.test.ts). Deshalb bleibt der QR-Debitor
+    // unveraendert nur auftraggeber.name, ohne Anhaengen von zusatz.
+    const auftraggeberMitZusatz = {
+      ...auftraggeber,
+      name: 'Universität St. Gallen',
+      zusatz: 'Institut für Banken und Finanzen',
+    };
+    const d = baueQrDaten(rechnung, auftraggeberMitZusatz);
+    expect(d.debtor?.name).toBe('Universität St. Gallen');
+    expect(d.debtor?.name).not.toContain('Institut');
+    expect((d.debtor?.name ?? '').length).toBeLessThanOrEqual(70);
+  });
 });

@@ -1,0 +1,32 @@
+﻿ ; ; ; ; ;MWST-; ;Sub-;;;;;
+Nummer;Bezeichnung;Shortcut;ISO;Inaktiv;Code;Fix;total;;;;;
+;;;;;;;;;;;;
+E r f o l g s r e c h n u n g;;;;;;;;;;;;
+;;;;;;;;;;;;
+3;Betriebsertrag;;;;;;;;;;;
+30;Leadership;;;;;;;;;;;
+301;Überbetriebliche Leistungen;;;;;;;;;;;
+3010;IGK / mittleres und oberes Kader;3010;CHF;;700;;;;;;;
+3011;IGK / Neue Führungskräfte;3011;CHF;;700;;;;;;;
+31;Banking;;;;;;;;;;;
+3100;Ausbildung von Lernenden;3100;CHF;;700;;;;;;;
+3101;Grundbildung;3101;CHF;;700;;;;;;;
+3102;Weiterentwicklung;3102;CHF;;700;;;;;;;
+31001;Ausbildung von Lernenden 7.7%;31001;CHF;;510;;;;;;;
+31021;Weiterentwicklung 7.7%;31021;CHF;;510;;;;;;;
+32;Beratung & Vertrieb;;;;;;;;;;;
+320;Vertrieb;;;;;;;;;;;
+3200;B+V / Zertifizierungen ohne SAQ;3200;CHF;;510;;;;;;;
+3204;SAQ Zertifizierung;3204;CHF;;510;;;;;;;
+32001;Beratungs- und Verkaufsprozesse 0%;32001;CHF;;U00;;;;;;;
+32041;Lizenzschulung 0%;32041;CHF;;U00;;;;;;;
+37;übrige Einnahmen;;;;;;;;;;;
+3700;Verkauf von Unterlagen 2.5%;3700;CHF;;520;;;;;;;
+4;Betriebsaufwand;;;;;;;;;;;
+50;Externe Workshops / Leadership;;;;;;;;;;;
+5000;Externe Workshops / Tagungen / Offsite 0.0%;5000;CHF;;;;;;;;Externe Workshops / Tagungen / Offsite;0
+51;Externe Banking / Nachwuchs;;;;;;;;;;;
+5100;Externe Banking 0.0%;5100;CHF;;;;;;;;Externe Banking ;0
+52;Externe Zertifizierung / Beratung&Vertrieb;;;;;;;;;;Externe Nachwuchs;8.1
+5200;Externe Zertifizierung 0.0%;5200;CHF;;;;;;;;SAQ-Zertifzierung;
+Total E r f o l g s r e c h n u n g;;;;;;;;;;;;
