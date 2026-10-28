@@ -14,6 +14,7 @@ import { registerDebitorRoutes } from './routes/debitor';
 import { registerPersonalRoutes } from './routes/personal';
 import { registerCrmRoutes } from './routes/crm';
 import { registerPmRoutes } from './routes/pm';
+import { registerBildungRoutes } from './routes/bildung';
 
 export type AppOptionen = { auth?: AuthKonfig; integration?: Partial<WorkerDeps>; publicLimits?: { lesenProMinute?: number; schreibenProMinute?: number } };
 
@@ -38,5 +39,6 @@ export function buildApp(pool: pg.Pool, opts: AppOptionen = {}): FastifyInstance
   registerCrmRoutes(app, pool);
   registerPmRoutes(app, pool);
   registerIntegrationRoutes(app, pool, integration);
+  registerBildungRoutes(app, pool);
   return app;
 }
