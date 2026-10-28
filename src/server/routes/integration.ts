@@ -7,6 +7,11 @@ import { createApiClient, listApiClients, updateApiClient, rotiereApiClient } fr
 import { listOutbox, wiederholen, publiziere } from '../../repos/outboxRepo';
 import { standardHandler, verarbeiteOutbox, type WorkerDeps } from '../../integrations/worker';
 import { MoodleFehler } from '../../integrations/moodle/client';
+import { abschlussSync } from '../../integrations/moodle/sync';
+import { importiereBuchungen, liesBuchungenCsv, type MoodleBuchung } from '../../integrations/moodle/buchungen';
+import { pruefeSignatur } from '../../integrations/webhooks';
+import { markiereAbgeschlossen } from '../../repos/anmeldungRepo';
+import { findeDurchfuehrungPerMoodleSession, anmeldungenZuMoodleAbschluss } from '../../repos/zuordnungRepo';
 import { ValidationError } from '../../domain/errors';
 
 /** Web-Service-Funktionen, die der Moodle-Token freigeben muss (Spec v2 §6.2). */
@@ -76,6 +81,47 @@ export function registerIntegrationRoutes(app: FastifyInstance, pool: pg.Pool, d
     const typ = (req.query as any).typ;
     const r = await pool.query(`select * from integration_lauf ${typ ? 'where typ=$1' : ''} order by id desc limit 50`, typ ? [typ] : []);
     return r.rows.map((x: any) => ({ id: Number(x.id), typ: x.typ, gestartetAm: x.gestartet_am, beendetAm: x.beendet_am, status: x.status, ergebnis: x.ergebnis }));
+  });
+
+  // --- Moodle: Kursabschluesse holen (Cron/Button)
+  app.post('/integration/moodle/abschluss-sync', { preHandler: requireAdmin }, async (req, reply) => {
+    const m = deps().moodle;
+    if (!m) return reply.code(409).send({ error: 'Moodle ist nicht konfiguriert' });
+    return abschlussSync(pool, m, async (p, id, zeit) => { await markiereAbgeschlossen(p, id, zeit, 'moodle', req.benutzer); },
+      { durchfuehrungId: (req.body as any)?.durchfuehrungId });
+  });
+
+  // --- Moodle: Face-to-Face-Buchungen einer Session uebernehmen (CSV-Export oder JSON)
+  app.post('/integration/moodle/buchungen', { preHandler: requireAdmin }, async (req, reply) => {
+    try {
+      const b = (req.body ?? {}) as { durchfuehrungId?: string; moodleSessionId?: number; csv?: string; buchungen?: MoodleBuchung[] };
+      const durchfuehrungId = b.durchfuehrungId ?? (b.moodleSessionId ? await findeDurchfuehrungPerMoodleSession(pool, Number(b.moodleSessionId)) : null);
+      if (!durchfuehrungId) throw new ValidationError('durchfuehrungId oder bekannte moodleSessionId angeben');
+      const buchungen = b.csv ? liesBuchungenCsv(b.csv) : b.buchungen ?? [];
+      if (!buchungen.length) throw new ValidationError('Keine Buchungen (csv oder buchungen[])');
+      return await importiereBuchungen(pool, durchfuehrungId, buchungen, req.benutzer);
+    } catch (e) { return sendError(reply, e); }
+  });
+
+  // --- Moodle-Ereignisse (Push, optional): signiert wie ausgehende Webhooks, Secret MOODLE_EVENT_SECRET.
+  // Eigener Plugin-Kontext: JSON wird als Rohtext gelesen, damit die HMAC-Signatur ueber die Originalbytes laeuft.
+  app.register(async (sub) => {
+    sub.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+      (req as any).rohKoerper = body;
+      try { done(null, body ? JSON.parse(body as string) : {}); } catch (e) { done(e as Error, undefined); }
+    });
+    sub.post('/integration/moodle/events', async (req, reply) => {
+      const secret = process.env.MOODLE_EVENT_SECRET;
+      if (!secret) return reply.code(404).send({ error: 'Moodle-Ereignisse nicht aktiviert' });
+      if (!pruefeSignatur(secret, req.headers['x-bbz-signature'] as string, req.headers['x-bbz-timestamp'] as string, (req as any).rohKoerper ?? '')) {
+        return reply.code(401).send({ error: 'Signatur ungueltig' });
+      }
+      const e = req.body as { eventname?: string; courseid?: number; relateduserid?: number; userid?: number; timecreated?: number };
+      if (e.eventname !== '\\core\\event\\course_completed') return { verarbeitet: 0, hinweis: 'Ereignis ignoriert' };
+      const ids = await anmeldungenZuMoodleAbschluss(pool, Number(e.courseid), Number(e.relateduserid ?? e.userid));
+      for (const id of ids) await markiereAbgeschlossen(pool, id, e.timecreated ? new Date(e.timecreated * 1000) : new Date(), 'moodle');
+      return { verarbeitet: ids.length };
+    });
   });
 
   // --- Moodle-Status: Erreichbarkeit, Version, freigegebene Funktionen

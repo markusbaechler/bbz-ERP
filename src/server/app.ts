@@ -4,6 +4,7 @@ import { registriereAuth, authKonfigAusEnv, type AuthKonfig } from './authHook';
 import { registrierePublicSchutz } from './publicSchutz';
 import { registriereStatisch } from './statisch';
 import { registerIntegrationRoutes } from './routes/integration';
+import { registerPublicRoutes } from './routes/public';
 import type { WorkerDeps } from '../integrations/worker';
 import { moodleAusEnv } from '../integrations/moodle/client';
 import { mailAusEnv } from '../integrations/mail';
@@ -41,6 +42,7 @@ export function buildApp(pool: pg.Pool, opts: AppOptionen = {}): FastifyInstance
   registerCrmRoutes(app, pool);
   registerPmRoutes(app, pool);
   registerIntegrationRoutes(app, pool, integration);
+  registerPublicRoutes(app, pool);
   registerBildungRoutes(app, pool);
   return app;
 }
