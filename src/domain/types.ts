@@ -14,6 +14,11 @@ export type Projekt = {
   auftraggeberId: string; ertragskontoId: string | null;
   budgetChf: number | null; budgetTage: number | null; mwstModus: 'exkl' | 'inkl';
   fortsetzungVonId: string | null;
+  // PM-Erweiterung (Migration 009, Spec v2 §5.3)
+  status: 'akquise' | 'offeriert' | 'laufend' | 'abgeschlossen' | 'abgesagt' | 'archiviert';
+  projektleitungId: string | null; ansprechpersonKontaktId: string | null;
+  startDatum: string | null; endDatum: string | null; beschrieb: string | null;
+  budgetStunden: number | null; aufwandBudgetChf: number | null; aufwandkontoId: string | null;
 };
 
 export type RechnungStatus = 'offen_prov' | 'def_vereinbart' | 'abgerechnet' | 'bezahlt' | 'storniert';
