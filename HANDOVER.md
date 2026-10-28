@@ -66,7 +66,7 @@ Wichtige Umgebungsvariablen: `.env.example`.
 | Finanzen | `rechnungRepo` (Festschreibung, Storno mit Freigabe), `debitorRepo`, `mahnungRepo`, QR/PDF | ✅ |
 | Integration | `routes/public.ts`, `publicSchutz.ts`, `integrations/{formulare,webhooks,mail,mailVorlagen,worker}.ts`, `integrations/moodle/*`, `routes/integration.ts`, `widget/bbz-kurse.js` | ✅ |
 | Auth | `authHook.ts` (dev/entra) | ✅ |
-| Migration | `tools/fm-analyse` (DDR), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie aus Reporting_KUBA.xlsx, `docs/analyse/KUBA-IMPORT.md`) | ✅ |
+| Migration | `tools/fm-analyse` (DDR, SaveAsXML, Data API), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie aus Reporting_KUBA.xlsx, `docs/analyse/KUBA-IMPORT.md`) | ✅ |
 | Frontend | `web/` (Vanilla-JS-PWA unter `/app/`, ohne Build): Cockpit, CRM (Pipeline, 360°), Projekte (Gantt, Kanban), Zeit, Bildung, SAQ (inkl. KUBA-Export), Finanzen, Ressourcen-Heatmap, Admin; Stammdaten via `routes/stammdaten.ts` (`/me`, `/konto`, `/mwst-satz`) | ✅ (E2E `test/e2e/smoke.mjs`) |
 
 ## Sicherheit (Review 28.10.2026, alle Befunde behoben, Tests: `test/sicherheit.test.ts`)
@@ -77,7 +77,7 @@ Wichtige Umgebungsvariablen: `.env.example`.
 - Storno erzeugt einen **Storno-Beleg (Gutschrift)** mit eigener lückenloser Nummer und gespiegelten Beträgen.
 
 ## Offene Punkte / nächste Schritte
-1. **FileMaker-DDR liefern** (Werkzeuge → Datenbank-Designreport → XML). Danach `npm run fm:analyse -- <Ordner>` ausführen und die Lücken aus Kapitel 9 schliessen.
+1. **FileMaker direkt analysieren**: DDR liefern (Werkzeuge → Datenbank-Designreport → XML, dann `npm run fm:analyse -- <Ordner>`) **oder** ohne Oberfläche über die Data API des Servers (`fm-analyse.ps1 -Server … -Datenbank Projekte -Benutzer …`, Konto mit `fmrest`). Danach die Lücken aus Kapitel 9 schliessen. Stand: `docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md` §3.
 2. **Echte Exporte migrieren** gemäss `docs/filemaker-analyse/MIGRATION.md`: Probelauf, Summenabgleich, `--zaehler-start` = nächste FM-RgNr.
 3. **Moodle (cometas)**: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`).
 4. **Zapier**: Die Zaps von SharePoint auf `/public/v1/formulare/<formular>` umstellen und die Feldnamen gegen das Mapping prüfen (`src/integrations/formulare.ts`, `ALIASE`).

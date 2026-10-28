@@ -10,6 +10,10 @@ export function berichtMarkdown(inv: FmInventar, a: Analyse, opts: { mitKonten?:
   const z: string[] = [];
   z.push(`# ${opts.titel ?? 'Funktionsumfang der FileMaker-Loesung'}`, '');
   z.push(`Quelle: ${opts.quelle ?? 'Datenbank-Designreport'} · Format ${inv.format}${inv.version ? ` · FileMaker ${inv.version}` : ''} · erzeugt mit \`tools/fm-analyse\``, '');
+  if (inv.format === 'DataAPI') {
+    z.push('> **Quelle Data API:** Tabellen sind Tabellenvorkommen und nur sichtbar, soweit sie auf einem Layout liegen. Script-Schritte, Formeln,',
+      '> Beziehungsschluessel und Konten liefert nur der Designreport (DDR). Datensatzinhalte wurden nicht uebernommen.', '');
+  }
   z.push('## 1. Kennzahlen', '');
   z.push('| Dateien | Tabellen | Felder | davon berechnet | Datensaetze | Tabellenvorkommen | Beziehungen | Layouts | Scripts | Script-Schritte | Wertelisten | Eigene Funktionen | Konten |');
   z.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
@@ -41,7 +45,7 @@ export function berichtMarkdown(inv: FmInventar, a: Analyse, opts: { mitKonten?:
 
   z.push('## 4. Beziehungen', '');
   for (const d of inv.dateien) for (const b of d.beziehungen) {
-    const bed = b.bedingungen.map((x) => `${x.links} ${x.typ === 'Equal' ? '=' : x.typ} ${x.rechts}`).join(' UND ');
+    const bed = b.bedingungen.map((x) => `${x.links} ${x.typ === 'Equal' ? '=' : x.typ} ${x.rechts}`).join(' UND ') || 'auf Layout verwendet, Schluessel nur im DDR';
     z.push(`- ${esc(d.name)}: **${esc(b.links)} → ${esc(b.rechts)}** (${esc(bed)})${b.kaskadeLoeschenRechts ? ' · loescht kaskadierend' : ''}${b.kaskadeErstellenRechts ? ' · erstellt Bezugsdatensaetze' : ''}`);
   }
   z.push('');

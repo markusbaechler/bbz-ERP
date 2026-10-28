@@ -17,6 +17,27 @@ Voraussetzung: FileMaker **Pro Advanced** (bis Version 18) oder FileMaker Pro ab
 
 **Alternative ab FileMaker 19.5:** *Datei → Kopie speichern als… → XML* (Format `FMSaveAsXML`). Das Werkzeug liest es experimentell.
 
+## Weg C – Data API des FileMaker Servers (ohne FileMaker-Oberfläche)
+
+Geeignet, wenn die Lösung auf einem **FileMaker Server** liegt (Spec v1: „Projekte“ auf `BBZ-AZ-SRVAPP01`) und niemand den DDR am Bildschirm erstellen kann. Das Werkzeug liest über die Data API: Layouts (mit Ordnern), Scripts (Namen und Ordner), Felder je Tabellenvorkommen (Typ, Berechnung/Statistik, global, Validierung, Werteliste), Wertelisten und die Datensatzanzahl je Tabellenvorkommen.
+
+Voraussetzungen:
+- Die Data API ist in der Admin Console des Servers aktiviert (Konnektoren → FileMaker Data API).
+- Es gibt ein Konto mit dem erweiterten Zugriffsrecht **fmrest** und Leserechten auf alle Layouts, am besten ein eigenes Analysekonto.
+- Die Metadaten-Endpunkte gibt es ab FileMaker Server 18 [Hypothese].
+- Der Server ist per **https** erreichbar. Bei einem internen Zertifikat setzt du `NODE_EXTRA_CA_CERTS=<CA-Datei>`. Die TLS-Prüfung wird nie abgeschaltet.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\fm-analyse\fm-analyse.ps1 -Server "https://bbz-az-srvapp01.<domäne>" -Datenbank Projekte,Seminare -Benutzer analyse
+```
+Das Skript fragt das Passwort verdeckt ab und übergibt es nur über die Umgebungsvariable `FM_PASSWORT`. Direkt geht es mit `FM_PASSWORT=… npm run fm:analyse -- --data-api https://… --datenbank Projekte --benutzer analyse`.
+
+Grenzen gegenüber Weg A:
+- Keine Script-Schritte, Formeln, Beziehungsschlüssel und Konten.
+- Tabellen erscheinen als Tabellenvorkommen und nur, soweit sie auf einem Layout liegen.
+
+Datensatzinhalte und die Werte feldbasierter Wertelisten werden **nicht** übernommen. Für die Datensatzanzahl liest das Werkzeug je Tabellenvorkommen einen Datensatz und verwirft ihn sofort; mit `--ohne-anzahl` entfällt auch das. Weg C liefert schnell den Umfang. Für die Lückenanalyse der Scripts bleibt Weg A massgebend.
+
 ## Auswertung starten
 
 ### Lokal (Windows, im Repo-Ordner)

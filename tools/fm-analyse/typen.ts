@@ -1,4 +1,4 @@
-/** Inventar einer FileMaker-Loesung, gewonnen aus dem Datenbank-Designreport (DDR) oder "Kopie als XML speichern". */
+/** Inventar einer FileMaker-Loesung, gewonnen aus dem Datenbank-Designreport (DDR), "Kopie als XML speichern" oder der Data API. */
 export type FmFeld = {
   id: string; name: string; typ: string; art: 'Normal' | 'Calculated' | 'Summary' | string;
   formel: string | null; autoEingabe: string[]; validierung: string[]; global: boolean; wiederholungen: number;
@@ -37,7 +37,7 @@ export type FmDatei = {
 };
 
 export type FmInventar = {
-  format: 'DDR' | 'SaveAsXML';
+  format: 'DDR' | 'SaveAsXML' | 'DataAPI';
   version: string | null;
   dateien: FmDatei[];
 };

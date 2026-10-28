@@ -33,5 +33,15 @@
 | Formulare WPForms → Zapier → SharePoint | [belegt: Datenschutzerklärung] | Formular-Eingang `/public/v1/formulare/*` |
 | Doppelte Terminpflege (Elementor-Listen, Formular-Dropdowns, Moodle) | [belegt: Website-Quelltext] | ERP als einziges Terminstammdatum, Widget/API |
 
-## 3. Nächster Schritt
-DDR erzeugen (2 Minuten, `ANLEITUNG.md`) → `npm run fm:analyse -- <Ordner>` → Kapitel „Lücken“ des Berichts prüfen → Mapping für die Datenmigration (`MIGRATION.md`) übernehmen.
+## 3. Stand der direkten Analyse (28.10.2026)
+| Weg | Was er liefert | Stand |
+|---|---|---|
+| A – Designreport (XML) | alles inkl. Script-Schritte, Formeln, Beziehungen, Rechte | Werkzeug fertig und getestet; **Export fehlt** (nur am Rechner mit FileMaker möglich) |
+| C – Data API des Servers | Layouts, Scripts (Namen), Felder je Tabellenvorkommen, Wertelisten, Datensatzanzahlen | Werkzeug fertig und getestet; **Zugang fehlt** (fmrest-Konto, https-Erreichbarkeit von `BBZ-AZ-SRVAPP01`) |
+| Computer Use | Claude erstellt den DDR selbst im FileMaker-Fenster | in der Cloud-Session nicht verfügbar; nötig ist eine Session auf dem Rechner mit FileMaker |
+| Weitere Belege | Google Drive, Repos bbz-marktanalyse und bbz_Kurswerkstatt durchsucht | keine FileMaker-Artefakte gefunden; bbz360 und crm-spa waren in dieser Session nicht zugänglich |
+
+Die Tabelle in Kapitel 1 bleibt deshalb **indirekt belegt**. Discovery-Bericht (Spec v1), echter Projekte-Export und Rechnungsbelege sind Primärquellen. Die Scripts sind es nicht.
+
+## 4. Nächster Schritt
+DDR erzeugen (2 Minuten, `ANLEITUNG.md` Weg A) **oder** Data-API-Lauf (Weg C) → `npm run fm:analyse` → Kapitel „Lücken“ des Berichts prüfen → Mapping für die Datenmigration (`MIGRATION.md`) übernehmen.
