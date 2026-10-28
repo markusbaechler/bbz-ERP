@@ -17,6 +17,8 @@
     "moodle:abschluss": "tsx src/integrations/moodle/abschlussMain.ts",
     "kuba:import": "tsx tools/kuba-import/cli.ts",
     "seed:demo": "tsx src/db/seedDemo.ts",
+    "demo:neu": "tsx --env-file=.env.demo tools/demo/neu.ts",
+    "demo": "tsx watch --env-file=.env.demo src/server/main.ts",
     "test:e2e": "node test/e2e/smoke.mjs"
   },
   "dependencies": {

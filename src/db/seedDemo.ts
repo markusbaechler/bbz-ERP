@@ -21,6 +21,7 @@ import { createPhase } from '../repos/phaseRepo';
 import { createMeilenstein, setMeilensteinErreicht } from '../repos/meilensteinRepo';
 import { createAufgabe } from '../repos/aufgabeRepo';
 import { createZeiterfassung, zeitVerrechnen } from '../repos/zeiterfassungRepo';
+import { createSpesen } from '../repos/spesenRepo';
 import { createReferent } from '../repos/referentRepo';
 import { createEinsatz } from '../repos/einsatzRepo';
 import { createKursangebot } from '../repos/kursangebotRepo';
@@ -220,6 +221,10 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
   await zeit(p3.id, sk.id, -4, 3, 'Kursadministration', false);
   await zeit(p4.id, ml.id, -16, 3, 'Offerte erstellen', false);
 
+  // Spesen zum Weiterverrechnen (Projekt -> Spesen -> verrechnen)
+  await createSpesen(pool, { projektId: p1.id, datum: tag(-50), art: 'km', beschreibung: 'Fahrt St. Gallen – Musterbank (retour)', menge: 84, ansatzChf: 0.7 }, 'ml');
+  await createSpesen(pool, { projektId: p1.id, datum: tag(-46), art: 'auslage', beschreibung: 'Raummiete Interviews', ansatzChf: 350 }, 'ml');
+
   // --- Referent:innen + Einsaetze -----------------------------------------------------------------
   const refIntern = await createReferent(pool, { typ: 'intern', mitarbeitendeId: ph.id, fachgebiete: ['Vertrieb', 'Führung'], tagessatzChf: 1800, halbtagessatzChf: 1000 });
   const refExtern = await createReferent(pool, { typ: 'extern', kontaktId: petra.id, anzeigename: 'Dr. Petra Lehrmuster', fachgebiete: ['Anlageberatung', 'SAQ'], tagessatzChf: 2200, halbtagessatzChf: 1200 });
@@ -236,7 +241,7 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
 
   // Vergangene Durchfuehrung (durchgefuehrt, Abschluss -> Lernnachweis)
   const altStart = werktag(-40);
-  const dAlt = await createDurchfuehrung(pool, { kursangebotId: bef.id, startDatum: altStart, endDatum: folgeWerktag(altStart), ort: 'St. Gallen', kapazitaet: 12, projektId: p3.id });
+  const dAlt = await createDurchfuehrung(pool, { kursangebotId: bef.id, startDatum: altStart, endDatum: folgeWerktag(altStart), ort: 'St. Gallen', kapazitaet: 12, projektId: p3.id, seminarnummer: '9901' });
   await setDurchfuehrungStatus(pool, dAlt.id, 'ausgeschrieben', 'sk');
   const altC = await meldeAn(pool, dAlt.id, { kontaktId: claudia.id });
   const altO = await meldeAn(pool, dAlt.id, { kontaktId: oliver.id });
@@ -250,7 +255,7 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
 
   // Naechste Durchfuehrung BEF: Kapazitaet 4 -> voll + Warteliste
   const befStart = werktag(14);
-  const dBef = await createDurchfuehrung(pool, { kursangebotId: bef.id, startDatum: befStart, endDatum: folgeWerktag(befStart), ort: 'St. Gallen', kapazitaet: 4, anmeldeschluss: tag(7), projektId: p3.id, leitungId: sk.id });
+  const dBef = await createDurchfuehrung(pool, { kursangebotId: bef.id, startDatum: befStart, endDatum: folgeWerktag(befStart), ort: 'St. Gallen', kapazitaet: 4, anmeldeschluss: tag(7), projektId: p3.id, leitungId: sk.id, seminarnummer: '9902' });
   await setDurchfuehrungStatus(pool, dBef.id, 'ausgeschrieben', 'sk');
   const b1 = await meldeAn(pool, dBef.id, { kontaktId: anna.id });
   const b2 = await meldeAn(pool, dBef.id, { kontaktId: daniel.id, rechnungsreferenz: 'KST 4711' });
@@ -261,11 +266,12 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
   await bestaetigeAnmeldung(pool, b2.anmeldung.id, 'sk');
   await referentZuweisen(pool, dBef.kurstage[0].id, { referentId: refExtern.id, rolle: 'Referentin' });
 
-  const dSaq = await createDurchfuehrung(pool, { kursangebotId: saqv.id, startDatum: werktag(35), endDatum: werktag(35), ort: 'Zürich', kapazitaet: 12, projektId: p3.id });
+  const dSaq = await createDurchfuehrung(pool, { kursangebotId: saqv.id, startDatum: werktag(35), endDatum: werktag(35), ort: 'Zürich', kapazitaet: 12, projektId: p3.id, seminarnummer: '9903' });
   await setDurchfuehrungStatus(pool, dSaq.id, 'ausgeschrieben', 'sk');
   for (const k of [claudia, eva, oliver]) await meldeAn(pool, dSaq.id, { kontaktId: k.id });
   const fueStart = werktag(60);
-  await createDurchfuehrung(pool, { kursangebotId: fue.id, startDatum: fueStart, endDatum: folgeWerktag(folgeWerktag(fueStart)), ort: 'Luzern', kapazitaet: 10, projektId: p3.id, preisChf: 2250 });
+  const dFue = await createDurchfuehrung(pool, { kursangebotId: fue.id, startDatum: fueStart, endDatum: folgeWerktag(folgeWerktag(fueStart)), ort: 'Luzern', kapazitaet: 10, projektId: p3.id, preisChf: 2250, seminarnummer: '9904' });
+  await setDurchfuehrungStatus(pool, dFue.id, 'ausgeschrieben', 'sk');
 
   // Zertifizierung, die bald ablaeuft (Rezertifizierung faellig)
   await createLernnachweis(pool, { kontaktId: claudia.id, datum: tag(-200), titel: 'Fachtagung Anlageberatung (extern)', lernstunden: 6 });
@@ -306,7 +312,7 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
   // --- Integration: API-Client fuer die Homepage (Schluessel wird nicht ausgegeben) ------------------
   await createApiClient(pool, { name: 'Homepage (Demo)', scopes: ['public:read', 'public:anmeldung', 'public:anfrage'], erlaubteOrigins: ['https://www.example.ch'] });
 
-  log(`Demo-Daten angelegt (Stichtag ${HEUTE}): 3 Mitarbeitende, 7 Organisationen, 16 Kontakte, 4 Projekte, 3 Kursangebote, 4 Durchfuehrungen, 3 SAQ-Vorgaenge, 3 Rechnungen.`);
+  log(`Demo-Daten angelegt (Stichtag ${HEUTE}): 3 Mitarbeitende, 7 Organisationen, 16 Kontakte, 4 Projekte, 3 Kursangebote, 4 Durchfuehrungen (Seminarnummern 9901–9904), 3 SAQ-Vorgaenge, 3 Rechnungen, 2 Spesen.`);
   log('Anmeldung im Dev-Modus z. B. als ml (Admin) oder ph/sk (Standard).');
   return true;
 }

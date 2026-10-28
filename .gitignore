@@ -10,3 +10,6 @@ fm-analyse-out/
 !test/fixtures/**/*.mer
 KUBA-IMPORT-BERICHT.md
 IMPORT-BERICHT.md
+
+# Lokale Testumgebung: generierte Beispieldateien (npm run demo:neu)
+demo-dateien/

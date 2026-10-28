@@ -34,13 +34,13 @@ TypeScript · Fastify 4 · PostgreSQL 16 (`pg`) · vitest · Vanilla-JS-PWA (`we
 ```bash
 docker compose up -d          # Postgres auf localhost:5433 (bbz/bbz)
 npm install
-npm test                      # 78 Suiten / 550 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
+npm test                      # 79 Suiten / 557 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
 npx tsc --noEmit
-npm run migrate && npm run seed:demo
-npm run dev                   # http://localhost:3000/app/
+npm run demo:neu && npm run demo   # Testumgebung: eigene DB bbz_demo, Testdaten, http://localhost:3000/app/ (README)
 npm run worker                # Outbox (Moodle, Webhooks, Mail)
 DATABASE_URL=postgres://bbz:bbz@localhost:5433/bbz_e2e npm run test:e2e   # Browser-Rundgang (42 Pruefungen, Screenshots)
 ```
+- `demo:neu` leert nur lokale DBs mit `demo` im Namen und legt Beispieldateien (Moodle-CSV, camt.054) in `demo-dateien/` ab.
 - `seed:demo` legt nur synthetische Daten an (`*.example`-Domains) und bricht ohne Aenderung ab, wenn die Demo-Mitarbeitenden (ml/ph/sk) schon existieren.
 - `test:e2e` verweigert DB-Namen ohne `test`/`web`/`e2e`/`demo` im Namen, weil es die Datenbank neu aufsetzt.
 Wichtige Umgebungsvariablen: `.env.example`.

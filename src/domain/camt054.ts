@@ -66,3 +66,22 @@ export function lfdNrAusQrr(referenz: string, prefix: string = CREDITOR.qrrPrefi
   const nr = Number(r.slice(prefix.length, 26));
   return nr > 0 ? nr : null;
 }
+
+export type Camt054Gutschrift = { betrag: number; datum: string; txRef: string; qrr?: string; mitteilung?: string; waehrung?: string };
+
+/** Minimale camt.054-Gutschriftsanzeige (Tests, Beispieldatei der Testumgebung): eine Sammelbuchung mit je einer TxDtls pro Zahlung. */
+export function baueCamt054(zahlungen: Camt054Gutschrift[]): string {
+  const tx = zahlungen.map((z) => `
+      <TxDtls><Refs><AcctSvcrRef>${z.txRef}</AcctSvcrRef></Refs>
+        <Amt Ccy="${z.waehrung ?? 'CHF'}">${z.betrag.toFixed(2)}</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+        <RmtInf>${z.qrr ? `<Strd><CdtrRefInf><Tp><CdOrPrtry><Prtry>QRR</Prtry></CdOrPrtry></Tp><Ref>${z.qrr}</Ref></CdtrRefInf></Strd>` : ''}${z.mitteilung ? `<Ustrd>${z.mitteilung}</Ustrd>` : ''}</RmtInf>
+      </TxDtls>`).join('');
+  const total = zahlungen.reduce((s, z) => s + z.betrag, 0);
+  const datum = zahlungen[0]?.datum ?? '2026-11-02';
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.054.001.08"><BkToCstmrDbtCdtNtfctn>
+  <GrpHdr><MsgId>T</MsgId><CreDtTm>${datum}T06:00:00</CreDtTm></GrpHdr>
+  <Ntfctn><Id>N</Id><Ntry><Amt Ccy="CHF">${total.toFixed(2)}</Amt><CdtDbtInd>CRDT</CdtDbtInd>
+    <BookgDt><Dt>${datum}</Dt></BookgDt><NtryDtls>${tx}</NtryDtls></Ntry></Ntfctn>
+</BkToCstmrDbtCdtNtfctn></Document>`;
+}
