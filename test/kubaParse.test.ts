@@ -167,6 +167,34 @@ describe('kuba-import: Vorgaenge (synthetische Standarddatei)', () => {
     expect(dq('First Certification', 20).map((d) => d.grund)).toContainEqual('WE1 RUN1: Passed-Wert erfasst, aber kein Pruefungsdatum – Run wird nicht ins ERP uebernommen (Datum ist Pflicht)');
   });
 
+  it('Grenzfaelle: nicht erfasst, VSS+VSM, Ende vor Start, Experte doppelt, Profil leer, Gleichstand -> Sheet 2', () => {
+    const person = (nachname: string) => ({ 'Last Name': nachname, 'First Name': 'Synth', 'Birth Date': { datum: '1990-01-01' }, 'Certificate Language': 'DE' });
+    const r = leseKuba(baueKubaXlsx({
+      first: [
+        { ...person('Unlesbar'), 'Certificate Program': 'KMU', 'WE All Passed': 'vielleicht', 'WE1 RUN1 Passed': 'yes', 'WE1 RUN1 Date': { datum: '2025-01-01' }, _kommentar: 'VSS 07.05.2026 und VSM: Synth' },
+        { ...person('Doppelt'), 'Certificate Program': 'IK', 'OE1 RUN1 Date': { datum: '2025-02-02' }, 'OE1 RUN1 Expert 1': 'Erika Expertin', 'OE1 RUN1 Expert 2': 'erika  EXPERTIN' },
+        { ...person('Ohneprofil'), 'WE1 RUN1 Passed': 'yes', 'WE1 RUN1 Date': { datum: '2025-01-01' } },
+        { ...person('Gleichstand'), 'Certificate Program': 'PK', 'WE1 RUN1 Passed': 'yes', 'WE1 RUN1 Date': { datum: '2025-01-01' } },
+      ],
+      issued: [
+        { ...person('Gleichstand'), 'Certificate Program': 'PK', 'Certificate Number': 'Z-9', 'Certificate Start Date': { datum: '2025-06-01' }, 'Certificate End Date': { datum: '2025-01-01' }, 'WE1 RUN1 Passed': 'yes', 'WE1 RUN1 Date': { datum: '2025-01-01' } },
+      ],
+    }), HEUTE);
+    const v = (n: string) => r.vorgaenge.find((x) => x.nachname === n)!;
+    expect(v('Unlesbar')).toMatchObject({ weStatus: 'nicht erfasst', status: 'nicht erfasst', vss: true, vsm: true });
+    expect(v('Unlesbar').erp).toMatchObject({ status: 'in_pruefung', kennzeichnung: 'VSS, VSM' });
+    expect(v('Doppelt').erp!.runs[0]).toMatchObject({ experte1: 'Erika Expertin', experte2: null, bestanden: null });
+    expect(v('Ohneprofil')).toMatchObject({ erp: null, nichtImportierbar: 'Certificate Program leer' });
+    expect(v('Gleichstand').herkunft).toEqual(['Ausgestellte Zertifikate:11', 'First Certification:14']);
+    expect(v('Gleichstand').erp).toMatchObject({ status: 'zertifiziert', zertifikat: { nr: 'Z-9', ausgestelltAm: '2025-06-01', gueltigBis: '2028-06-01' } });
+    expect(r.dq.map((d) => `${d.zeile} ${d.header}: ${d.grund}`)).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^11 WE All Passed: Passed-Wert nicht in Whitelist/),
+      expect.stringMatching(/^12 OE1 RUN1 Expert 2: Experte 1 = Experte 2/),
+      expect.stringMatching(/^13 Certificate Program: Certificate Program leer – Vorgang wird nicht importiert/),
+      expect.stringMatching(/^11 Certificate End Date: Certificate End Date 2025-01-01 liegt nicht nach dem Start 2025-06-01/),
+    ]));
+  });
+
   it('Data-Quality-Log ist nach Sheet und Zeile sortiert und hat Sheet, Zeile, Header, Rohwert, Grund', () => {
     const schluessel = e.dq.map((d) => `${d.sheet === 'First Certification' ? 0 : 1}-${String(d.zeile).padStart(3, '0')}`);
     expect(schluessel).toEqual([...schluessel].sort());
