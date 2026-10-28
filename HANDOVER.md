@@ -77,7 +77,7 @@ Wichtige Umgebungsvariablen: `.env.example`.
 - Storno erzeugt einen **Storno-Beleg (Gutschrift)** mit eigener lückenloser Nummer und gespiegelten Beträgen.
 
 ## Offene Punkte / nächste Schritte
-1. **FileMaker direkt analysieren**: DDR liefern (Werkzeuge → Datenbank-Designreport → XML, dann `npm run fm:analyse -- <Ordner>`) **oder** ohne Oberfläche über die Data API des Servers (`fm-analyse.ps1 -Server … -Datenbank Projekte -Benutzer …`, Konto mit `fmrest`). Danach die Lücken aus Kapitel 9 schliessen. Stand: `docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md` §3.
+1. **FileMaker direkt analysieren**: DDR liefern (Werkzeuge → Datenbank-Designreport → XML, dann `npm run fm:analyse -- <Ordner>`) **oder** ohne Oberfläche über die Data API des Servers (`fm-analyse.ps1 -Server … -Datenbank Projekte -Benutzer …`, Konto mit `fmrest`). Danach die Lücken aus Kapitel 9 schliessen. Stand: `docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md` §3. Gewählter Weg: lokale Session mit Computer Use (`docs/filemaker-analyse/LOKALE-SESSION.md`).
 2. **Echte Exporte migrieren** gemäss `docs/filemaker-analyse/MIGRATION.md`: Probelauf, Summenabgleich, `--zaehler-start` = nächste FM-RgNr.
 3. **Moodle (cometas)**: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`).
 4. **Zapier**: Die Zaps von SharePoint auf `/public/v1/formulare/<formular>` umstellen und die Feldnamen gegen das Mapping prüfen (`src/integrations/formulare.ts`, `ALIASE`).
