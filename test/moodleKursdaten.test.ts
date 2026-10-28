@@ -7,7 +7,7 @@ import { createOrganisation } from '../src/repos/organisationRepo';
 import { createAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { listAnmeldungen } from '../src/repos/anmeldungRepo';
 import { getKontakt } from '../src/repos/kontaktRepo';
-import { getDurchfuehrung } from '../src/repos/durchfuehrungRepo';
+import { getDurchfuehrung, updateDurchfuehrung } from '../src/repos/durchfuehrungRepo';
 import { liesBuchungenCsv, importiereKursdatenBericht } from '../src/integrations/moodle/buchungen';
 
 /*
@@ -52,8 +52,15 @@ describe('Moodle-Bericht "Anmeldungen Kursdaten V2"', () => {
     expect(z[0].telefon).toBe('071 000 00 01');
   });
 
-  it('die Durchfuehrung fuehrt die Seminarnummer', async () => {
+  it('die Durchfuehrung fuehrt die Seminarnummer; leer gespeichert = keine (Formular schickt "")', async () => {
     expect((await getDurchfuehrung(pool, d1)).seminarnummer).toBe('8961');
+    const ka = await angebot(pool);
+    const x = (await ausgeschrieben(pool, ka.id)).id;
+    const y = (await ausgeschrieben(pool, ka.id)).id;
+    await updateDurchfuehrung(pool, x, { seminarnummer: ' ' });
+    await updateDurchfuehrung(pool, y, { seminarnummer: '' });
+    expect((await getDurchfuehrung(pool, y)).seminarnummer).toBeNull();
+    expect((await updateDurchfuehrung(pool, x, { seminarnummer: ' 7777 ' })).seminarnummer).toBe('7777');
   });
 
   it('ordnet ueber die Seminarnummer zu, bestaetigt die Buchungen und meldet unbekannte Seminarnummern', async () => {

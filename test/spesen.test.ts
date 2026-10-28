@@ -38,6 +38,7 @@ describe('Spesen', () => {
     await expect(createSpesen(pool, { projektId, datum: '05.10.2026', art: 'km', beschreibung: 'x', menge: 1, ansatzChf: 1 })).rejects.toBeInstanceOf(ValidationError);
     await expect(createSpesen(pool, { projektId, datum: '2026-10-05', art: 'flug' as any, beschreibung: 'x', ansatzChf: 1 })).rejects.toBeInstanceOf(ValidationError);
     await expect(createSpesen(pool, { projektId, datum: '2026-10-05', art: 'km', beschreibung: 'x', menge: 0, ansatzChf: 1 })).rejects.toBeInstanceOf(ValidationError);
+    await expect(createSpesen(pool, { projektId, datum: '2026-10-05', art: 'km', beschreibung: 'ohne km', ansatzChf: 0.7 })).rejects.toThrow(/Kilometer/);
     await expect(createSpesen(pool, { projektId, datum: '2026-10-05', art: 'auslage', beschreibung: ' ', ansatzChf: 10 })).rejects.toBeInstanceOf(ValidationError);
   });
 

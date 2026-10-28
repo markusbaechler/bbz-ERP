@@ -220,6 +220,8 @@ export async function createDurchfuehrung(db: Db, input: DurchfuehrungInput): Pr
  */
 export async function updateDurchfuehrung(db: Db, id: string, patch: DurchfuehrungPatch): Promise<DurchfuehrungDetail> {
   pruefeFelder(patch);
+  // Formulare schicken "" fuer leer; die Seminarnummer ist eindeutig, leer heisst keine
+  if (patch.seminarnummer !== undefined) patch = { ...patch, seminarnummer: patch.seminarnummer?.trim() || null };
   return mitTransaktion(db, async (c) => {
     const alt = await sperreDurchfuehrung(c, id);
     zeitraum(patch.startDatum ?? alt.startDatum, patch.endDatum ?? alt.endDatum);

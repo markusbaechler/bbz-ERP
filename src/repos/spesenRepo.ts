@@ -31,6 +31,7 @@ export async function createSpesen(db: Db, input: SpesenInput, benutzer: string 
   pruefeDatum('datum', input?.datum, true);
   if (!SPESEN_ARTEN.includes(input.art)) throw new ValidationError(`art muss ${SPESEN_ARTEN.join('|')} sein`);
   if (!input.beschreibung?.trim()) throw new ValidationError('beschreibung ist Pflicht');
+  if (input.art === 'km' && (input.menge === undefined || input.menge === null)) throw new ValidationError('Kilometer (menge) sind bei einer Fahrt Pflicht');
   const menge = input.menge ?? 1;
   if (!(typeof menge === 'number' && menge > 0)) throw new ValidationError('menge muss > 0 sein');
   if (!(typeof input.ansatzChf === 'number' && input.ansatzChf >= 0)) throw new ValidationError('ansatzChf muss >= 0 sein');
