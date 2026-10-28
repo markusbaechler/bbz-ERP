@@ -49,6 +49,9 @@ button, input, select, textarea { font-family: inherit; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 [hidden] { display: none !important; }
 .bbz-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+/* Scroll-Container positionieren: sonst entkommen absolut positionierte Kinder (z. B. .bbz-sr-only) dem Clipping
+   und verbreitern das Dokument (horizontaler Seiten-Scroll auf dem Handy). */
+.bbz-table-wrap, .bbz-kanban, .bbz-kanban-list, .bbz-heat-wrap, .bbz-gantt-wrap, .bbz-tabs, .bbz-nav, .bbz-modal-body, .bbz-card { position: relative; }
 .bbz-skip { position: absolute; left: 8px; top: -40px; z-index: 200; background: var(--blue); color: #fff; padding: 8px 12px; border-radius: var(--r-sm); text-decoration: none; font-weight: 600; }
 .bbz-skip:focus { top: 8px; }
 
