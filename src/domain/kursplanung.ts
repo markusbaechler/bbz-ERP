@@ -76,6 +76,23 @@ export function werktageZwischen(start: string, ende: string): string[] {
   return tage;
 }
 
+const ZEIT_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
+/** Kurstag pruefen: Datum innerhalb der Durchfuehrung, Zeiten HH:MM, `bis` nach `von`. Zeiten werden auf HH:MM gekuerzt. */
+export function pruefeKurstag<T extends { datum: string; von?: string | null; bis?: string | null }>(k: T, start: string, ende: string): T {
+  pruefeDatum(k.datum, 'kurstag.datum');
+  if (k.datum < start || k.datum > ende) {
+    throw new ValidationError(`Kurstag ${k.datum} liegt ausserhalb der Durchfuehrung (${start} bis ${ende})`);
+  }
+  for (const f of ['von', 'bis'] as const) {
+    const v = k[f];
+    if (v !== undefined && v !== null && !ZEIT_RE.test(v)) throw new ValidationError(`${f} muss eine Uhrzeit HH:MM sein`);
+  }
+  const von = zeitKurz(k.von); const bis = zeitKurz(k.bis);
+  if (von && bis && von >= bis) throw new ValidationError('bis muss nach von liegen');
+  return { ...k, von: von ?? null, bis: bis ?? null };
+}
+
 const UMLAUTE: Record<string, string> = { ä: 'ae', ö: 'oe', ü: 'ue', Ä: 'ae', Ö: 'oe', Ü: 'ue', ß: 'ss' };
 
 /** URL-tauglicher Slug: deutsche Umlaute ausgeschrieben, Akzente entfernt, alles andere zu Bindestrichen. */

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   werktageZwischen, slugify, durchfuehrungsCode, naechsteDurchfuehrungsNummer, addTage, addMonate, tageZwischen,
-  istIsoDatum, pruefeDurchfuehrungsStatus, zeitKurz,
+  istIsoDatum, pruefeDurchfuehrungsStatus, zeitKurz, pruefeKurstag,
 } from '../src/domain/kursplanung';
 import { annullationsgebuehr } from '../src/domain/annullation';
 import { rezertifizierungsStatus, standardGueltigBis } from '../src/domain/rezertifizierung';
@@ -44,6 +44,13 @@ describe('kursplanung', () => {
   it('kuerzt Uhrzeiten auf HH:MM', () => {
     expect(zeitKurz('08:30:00')).toBe('08:30');
     expect(zeitKurz(null)).toBeNull();
+  });
+  it('prueft Kurstage (Zeitraum, Uhrzeiten)', () => {
+    expect(pruefeKurstag({ datum: '2026-11-02', von: '08:30:00', bis: '17:00' }, '2026-11-02', '2026-11-03'))
+      .toEqual({ datum: '2026-11-02', von: '08:30', bis: '17:00' });
+    expect(() => pruefeKurstag({ datum: '2026-11-04' }, '2026-11-02', '2026-11-03')).toThrow(ValidationError);
+    expect(() => pruefeKurstag({ datum: '2026-11-02', von: '8 Uhr' }, '2026-11-02', '2026-11-03')).toThrow(ValidationError);
+    expect(() => pruefeKurstag({ datum: '2026-11-02', von: '12:00', bis: '12:00:00' }, '2026-11-02', '2026-11-03')).toThrow(ValidationError);
   });
   it('Statusuebergaenge der Durchfuehrung', () => {
     expect(() => pruefeDurchfuehrungsStatus('geplant', 'ausgeschrieben', 1)).not.toThrow();
