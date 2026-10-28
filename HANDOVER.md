@@ -1,56 +1,85 @@
-# Handover — bbz Projekt- & Verrechnungssystem (bbz-ERP)
+# Handover – bbz-ERP (Stand 2026-10-28)
 
-Stand: 2026-07-27. Dieses Dokument erlaubt einer neuen Session/Person, nahtlos weiterzubauen.
+Dieses Dokument erlaubt einer neuen Session oder Person, nahtlos weiterzubauen.
 
 ## Was das ist
-Ablösung des FileMaker-Kernstücks „Projekte" (gehostet auf `BBZ-AZ-SRVAPP01`) durch eine eigenständige Web-App: **Projekte + Verrechnung (QR-Rechnung) + Debitorenkontrolle** für bbz (Banken-Bildung). v1 = Finanz-Kern, kein Teilnehmer-/Seminarteil.
+Ablösung der FileMaker-Lösung „Projekte“ (`BBZ-AZ-SRVAPP01`) durch ein **Web-ERP für alle Geschäftsprozesse** des Bankenberatungszentrums bbz st.gallen ag:
+
+- CRM
+- Projektmanagement
+- Seminarbetrieb
+- SAQ-Zertifizierung
+- Finanzen (QR-Rechnung, Debitoren, Mahnwesen)
+
+Dazu kommen die Anbindungen an die **Homepage** (WordPress/WPForms/Zapier) und an **Moodle** (mybbz/cometas).
+
+- v1 (Plan 1–4, Juli 2026): Finanz-Kern.
+- v2 (diese Session): alle übrigen Module, Integrationen, Migration und Frontend.
 
 ## Wo alles liegt
-- **Repo:** `github.com/markusbaechler/bbz-ERP` · lokal `C:\Users\markus.baechler\Documents\bbz_vc\bbz-projekte`
-- **Spec:** `docs/superpowers/specs/2026-07-26-projekt-verrechnung-debitoren-design.md`
-- **Pläne:** `docs/superpowers/plans/` (1 Fundament, 2 Verrechnung/MWSt, 3 QR/PDF — je 6 total)
-- **Discovery + echte Belege + Beispiel-PDF:** `..\fm-discovery\` (DISCOVERY-REPORT.md, screens/)
-- **Projektgedächtnis:** Claude-Memory `filemaker-ablosung-projekt.md`
+| Was | Wo |
+|---|---|
+| Gesamt-Spec v2 (Prozesse, Module, API-Vertrag) | `docs/superpowers/specs/2026-10-28-erp-gesamtsystem-design.md` |
+| Spec v1 (Finanz-Kern) + Pläne 1–4 | `docs/superpowers/specs/2026-07-26-…`, `docs/superpowers/plans/` |
+| Geschäftsprozesse laut Website (belegt, mit Quellen) | `docs/analyse/WEBSITE-GESCHAEFTSPROZESSE.md` |
+| FileMaker analysieren (DDR) / Abdeckung / Migration | `docs/filemaker-analyse/` (ANLEITUNG, FUNKTIONSUMFANG-STAND, MIGRATION) |
+| Homepage- und Moodle-Anbindung, OpenAPI | `docs/integration/` |
+| Alle Routen (generiert) | `docs/API-ROUTEN.md` (`npm run api:routen`) |
+| Verwandte Repos | `crm-spa` (bisheriges CRM, SharePoint), `bbz-saq` (Zertifizierungs-Cockpit, Reporting KUBA) |
 
-## Stack (umgesetzt)
-TypeScript · Fastify · PostgreSQL (`pg`) · vitest · `swissqrbill` 4.4 + `pdfkit`. Ziel-Hosting: Azure Postgres **Switzerland North** + Entra-ID (noch nicht verdrahtet — Auth ist aktuell Header-Platzhalter `x-user-role`).
+## Stack
+TypeScript · Fastify 4 · PostgreSQL 16 (`pg`) · vitest · Vanilla-JS-PWA (`web/`) · `swissqrbill` + `pdfkit` · `jose` (Entra-ID-JWT) · `fast-xml-parser` (DDR) · `@fastify/static`. Ziel-Hosting: Azure (App Service + Azure Database for PostgreSQL, **Switzerland North**). Docker: `Dockerfile`, `docker-compose.prod.yml`.
 
 ## Lokal starten / testen
 ```bash
-docker compose up -d          # Postgres auf localhost:5433 (User/DB/PW = bbz)
+docker compose up -d          # Postgres auf localhost:5433 (bbz/bbz)
 npm install
-npm test                      # vitest, alle Suites (DB nötig)
-npx tsc --noEmit              # Typecheck
-npm run dev                   # Server (Fastify) auf :3000
+npm test                      # alle Suiten (DB noetig); Browser-Test des Widgets laeuft nur mit installiertem Playwright
+npx tsc --noEmit
+npm run migrate && npm run seed:demo
+npm run dev                   # http://localhost:3000/app/
+npm run worker                # Outbox (Moodle, Webhooks, Mail)
 ```
-Env: `DATABASE_URL` hat Fallback in `vitest.config.ts`; `.env` = lokale DB. `git config core.autocrlf false` ist gesetzt.
+Wichtige Umgebungsvariablen: `.env.example`.
+- In Produktion (`NODE_ENV=production`) ist `AUTH_MODE=dev` **gesperrt**; dort gilt `AUTH_MODE=entra`.
 
-## Konventionen (bitte beibehalten)
-- **TDD**, bite-sized: Test → rot → Implementierung → grün → Commit (ein Commit je Task).
-- **Ein Branch + PR je Plan** (`planN-...`), Basis `master`; PR mergen, dann nächsten Plan ab `master`.
-- Aller DB-Zugriff nur über `src/repos/*` (Portabilität). Domänenlogik DB-frei in `src/domain/*`.
-- Beträge `numeric(12,2)`; DATE als String (TZ-sicher, `pool.ts` type-parser).
-- Deutsch, „ss" statt „ß". Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+## Architektur-Konventionen (beibehalten)
+- **TDD**, kleine Commits. Deutsch, „ss“ statt „ß“.
+- DB-Zugriff nur über `src/repos/*`, Fachlogik DB-frei in `src/domain/*`.
+- Repos akzeptieren `Db` (Pool oder PoolClient), damit sie in Transaktionen laufen.
+- Fehler: `ValidationError` 400, `NotFoundError` 404, `ConflictError` 409. Abbildung über `src/server/http.ts`.
+- Alles, was das System verlässt (Moodle, Webhooks, Mail), läuft über die **transaktionale Outbox** (`src/repos/outboxRepo.ts`, Worker `src/integrations/worker.ts`).
+- Öffentliche Endpunkte: nur `/public/v1/*` (API-Schlüssel + Scope + Origin + Idempotenz). Sie nehmen keine internen IDs von aussen an und geben keine Personendaten heraus.
+- Beträge `numeric(12,2)`, Datum als `YYYY-MM-DD`, Rappenrundung 0.05.
 
-## Fortschritt (alle in `master` gemergt)
-- **Plan 1 Fundament & Projekte** ✅ — Migrations, Konto, MWSt-Satz, Auftraggeber (Pflichtadresse), Projekt (Stammnummer.Jahr, Jahresverlauf, Kontierung), Fastify+Rollen, REST.
-- **Plan 2 Verrechnung & MWSt** ✅ — MWSt-Engine (Rappenrundung 0.05, mehrsatzig, exkl/inkl), rechnung/rechnungsposition/zaehler, Festschreibung mit **lückenloser** Nummer (Zähler+Transaktion), Status/Storno, REST.
-- **Plan 3 QR-Rechnung & PDF** ✅ — QRR-Referenz (Golden reproduziert echten Beleg), swissqrbill-Daten, PDF (Brief+Zahlteil), `GET /rechnung/:id/pdf`. Beispiel-PDF in `..\fm-discovery\screens\beispiel_qr_rechnung.pdf`.
-- **Plan 4 Debitorenkontrolle** ✅ — `zahlungseingang` (manuell), Zahlung+Statuswechsel transaktional, offene Posten, Kontokorrent-Saldo, REST. **39 Tests grün.**
+## Module (alle in `master`-Kandidat `claude/admiring-archimedes-2segqh`)
+| Modul | Kern-Dateien | Status |
+|---|---|---|
+| Personal/Ressourcen | `mitarbeitendeRepo`, `referentRepo`, `einsatzRepo` (Advisory-Lock gegen Überbuchung) | ✅ |
+| CRM | `organisationRepo`, `kontaktRepo`, `aktivitaetRepo`, `verkaufschanceRepo`, `anfrageRepo`, `crmAuswertungRepo`, `routes/crm.ts` | ✅ |
+| Projektmanagement | `projektRepo`, `phaseRepo`, `meilensteinRepo`, `aufgabeRepo`, `zeiterfassungRepo`, `pmAuswertungRepo`, `domain/cockpit.ts`, `routes/pm.ts` | ✅ |
+| Bildung | `kursangebotRepo`, `durchfuehrungRepo`, `anmeldungRepo` (`meldeAn` mit Zeilensperre), `lernnachweisRepo`, `bildungVerrechnungRepo`, `routes/bildung.ts` | ✅ |
+| SAQ | `saqRepo` (KUBA-Modell), `domain/saq.ts`, `routes/saq.ts`, KUBA-Export | ✅ |
+| Finanzen | `rechnungRepo` (Festschreibung, Storno mit Freigabe), `debitorRepo`, `mahnungRepo`, QR/PDF | ✅ |
+| Integration | `routes/public.ts`, `publicSchutz.ts`, `integrations/{formulare,webhooks,mail,mailVorlagen,worker}.ts`, `integrations/moodle/*`, `routes/integration.ts`, `widget/bbz-kurse.js` | ✅ |
+| Auth | `authHook.ts` (dev/entra) | ✅ |
+| Migration | `tools/fm-analyse` (DDR), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie) | ✅ / siehe unten |
+| Frontend | `web/` (PWA unter `/app/`) | siehe unten |
 
-## Nächste Schritte (für neue Session)
-1. **Plan 5 Migration** aus FileMaker-Export (auftraggeber/konto/mwst_satz/projekt), **Zähler-Startwert** (`zaehler.rechnung_lfd_nr`) = FileMaker-Max der Rechnungsnummer setzen, Summen-Validierung gegen FileMaker-Report. Rohdaten in `..\fm-discovery\export\`.
-2. **Plan 6 Frontend-PWA** + Entra-ID-Auth (echte Token statt Header-Platzhalter `x-user-role`).
-3. Danach: Swico/S1-String, PDF-Feinlayout, camt-Import (v2).
-
-## Offene Punkte / To-verify
-- `qrrPrefix` (`7610400` in `src/config/creditor.ts`) final gegen **SZKB-ISR-Vertrag** bestätigen (Golden deckt aktuellen Stand).
-- **Swico/S1-String** (`additionalInformation`) für maschinenlesbare MWSt im QR-Teil.
-- Rundungsregel 0.05 vs. 0.01 — aktuell 0.05, gegen Beleg bestätigt.
-- npm-audit-Warnungen (transitive Deps) bei Bedarf adressieren.
-- Auth: Entra-ID/MSAL echt verdrahten (Plan 6).
-
-## So übernimmt eine neue Session
-1. Memory `filemaker-ablosung-projekt.md` + dieses HANDOVER.md lesen.
-2. Repo klonen/öffnen, `docker compose up -d`, `npm install`, `npm test` (muss grün sein).
-3. Nächsten Plan schreiben/ausführen mit den Superpowers-Skills (writing-plans → executing-plans), Konventionen oben.
+## Offene Punkte / nächste Schritte
+1. **FileMaker-DDR liefern** (Werkzeuge → Datenbank-Designreport → XML). Danach `npm run fm:analyse -- <Ordner>` ausführen und die Lücken aus Kapitel 9 schliessen.
+2. **Echte Exporte migrieren** gemäss `docs/filemaker-analyse/MIGRATION.md`: Probelauf, Summenabgleich, `--zaehler-start` = nächste FM-RgNr.
+3. **Moodle (cometas)**: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`).
+4. **Zapier**: Die Zaps von SharePoint auf `/public/v1/formulare/<formular>` umstellen und die Feldnamen gegen das Mapping prüfen (`src/integrations/formulare.ts`, `ALIASE`).
+5. **Entra ID**: App-Registrierung für API (Audience) und PWA (SPA) anlegen und die App-Rolle `bbz.admin` vergeben. In `web/config.js` `authMode: 'entra'` setzen.
+6. Mit Fachseite verifizieren:
+   - SAQ-Bestehensgrenze: Die Website sagt „> 70 %“, KUBA „ab 70 %“; umgesetzt ist ≥ 70 %.
+   - Mahnfristen der Stufen 2/3 [Hypothese].
+   - QRR-Präfix gegen den SZKB-ISR-Vertrag.
+   - Annullationsstaffeln für SAQ und Projekte (aktuell nur „öffentlich“ produktiv).
+7. v2.1:
+   - camt.054-Import
+   - Gutschrift bei Storno nach Verrechnung
+   - Preisregeln für Bankengruppen und Staffelpreise
+   - `rechnung.durchfuehrung_id`
+   - Briefvorlagen-Editor (Serienbriefe)

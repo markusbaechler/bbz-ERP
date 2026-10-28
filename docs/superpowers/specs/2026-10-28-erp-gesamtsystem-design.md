@@ -1,6 +1,6 @@
 # Design-Spec: bbz-ERP Gesamtsystem (v2)
 
-**Datum:** 2026-10-28 · **Status:** in Umsetzung · **Vorgänger:** `2026-07-26-projekt-verrechnung-debitoren-design.md` (v1, Finanz-Kern, umgesetzt in Plan 1–4)
+**Datum:** 2026-10-28 · **Status:** umgesetzt (Branch `claude/admiring-archimedes-2segqh`; offene Punkte §9 und HANDOVER.md) · **Vorgänger:** `2026-07-26-projekt-verrechnung-debitoren-design.md` (v1, Finanz-Kern, umgesetzt in Plan 1–4)
 
 > **Kennzeichnung:** [belegt: Quelle] = aus Code, Discovery, Drive-Dokument oder Website verifiziert · [Hypothese] = plausibel, aber noch nicht bestätigt · [Entscheid] = Designentscheid dieser Spec.
 
@@ -181,7 +181,7 @@ v1 unverändert. Neu: Zeit→Rechnung (§5.3), Anmeldungen→Rechnung (§5.4), *
 **Mahnwesen [belegt: AGB]:** Fälligkeit = Rechnungsdatum + `zahlungsfrist_tage` (Default 30). `GET /debitoren/mahnvorschlag?stichtag` listet überfällige offene Posten mit nächster Stufe. `POST /debitoren/mahnlauf {stichtag, rechnungIds?}` (Admin) erzeugt Mahnungen: Stufe 1 = Erinnerung, Frist 10 Tage, ohne Gebühr; ab Stufe 2 CHF 50 Gebühr; max. Stufe 3, danach Inkasso-Liste. Eine neue Stufe entsteht erst nach Ablauf der Frist der vorherigen. camt-Import folgt in v2.1.
 
 ### 5.6 Dashboard / Reporting
-`GET /dashboard` aggregiert: meine Aufgaben (überfällig/Woche), Wiedervorlagen, neue Anfragen, Pipeline gewichtet, Projekte mit Ampel ≠ grün, nächste Durchführungen mit Belegung, offene Posten total, Outbox-Fehler.
+Die PWA setzt das Cockpit aus den Modul-Endpunkten zusammen [Entscheid; ein serverseitiges `GET /dashboard` ist nicht nötig]. Inhalt: meine Aufgaben (überfällig/Woche), Wiedervorlagen, neue Anfragen, Pipeline gewichtet, Projekte mit Ampel ≠ grün, nächste Durchführungen mit Belegung, offene Posten total, Outbox-Fehler.
 
 ## 6. Integrationen
 
