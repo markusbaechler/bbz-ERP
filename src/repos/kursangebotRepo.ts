@@ -91,7 +91,7 @@ export async function createKursangebot(db: Db, input: KursangebotInput): Promis
   const r = await db.query(
     `insert into kursangebot(code,titel,untertitel,bereich,format,beschreibung,lernziele,zielgruppe,voraussetzungen,dauer_tage,
        lernstunden,preis_chf,mwst_satz,ertragskonto_id,saq_anerkannt,moodle_vorlage_kurs_id,oeffentlich,slug,aktiv)
-     values ($1,$2,$3,$4,coalesce($5,'praesenz'),$6,$7,$8,$9,$10,$11,$12,coalesce($13,0),$14,coalesce($15,false),$16,coalesce($17,false),$18,coalesce($19,true))
+     values ($1,$2,$3,$4,coalesce($5,'praesenz'),$6,$7,$8,$9,$10,$11,$12,coalesce($13::numeric,0),$14,coalesce($15,false),$16,coalesce($17,false),$18,coalesce($19,true))
      returning *`,
     [n.code, n.titel, n.untertitel ?? null, n.bereich, n.format ?? null, n.beschreibung ?? null, n.lernziele ?? null,
      n.zielgruppe ?? null, n.voraussetzungen ?? null, n.dauerTage ?? null, n.lernstunden ?? null, n.preisChf ?? null,
