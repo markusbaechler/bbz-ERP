@@ -156,7 +156,7 @@ export async function meldeAn(db: Db, durchfuehrungId: string, input: MeldeAnInp
       if (w) return w;
     }
     if (e?.code === '23505' && e.constraint === 'anmeldung_aktiv_uq') {
-      throw new ConflictError('Diese Person ist fuer die Durchfuehrung bereits angemeldet');
+      throw new DoppelanmeldungError('Diese Person ist fuer die Durchfuehrung bereits angemeldet');
     }
     throw e;
   }

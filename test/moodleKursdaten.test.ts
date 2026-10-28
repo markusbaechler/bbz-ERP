@@ -7,7 +7,7 @@ import { createOrganisation } from '../src/repos/organisationRepo';
 import { createAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { listAnmeldungen } from '../src/repos/anmeldungRepo';
 import { getKontakt } from '../src/repos/kontaktRepo';
-import { getDurchfuehrung, updateDurchfuehrung } from '../src/repos/durchfuehrungRepo';
+import { createDurchfuehrung, getDurchfuehrung, updateDurchfuehrung } from '../src/repos/durchfuehrungRepo';
 import { liesBuchungenCsv, importiereKursdatenBericht } from '../src/integrations/moodle/buchungen';
 
 /*
@@ -84,6 +84,15 @@ describe('Moodle-Bericht "Anmeldungen Kursdaten V2"', () => {
   it('ist idempotent', async () => {
     const r = await importiereKursdatenBericht(pool, BERICHT, 'ml');
     expect(r.seminare.map((s) => [s.neu, s.bereitsVorhanden])).toEqual([[0, 2], [0, 1]]);
+  });
+
+  it('meldet eine abgelehnte Buchung als Fehler, nicht als "bereits vorhanden" (Durchfuehrung noch geplant)', async () => {
+    const ka = await angebot(pool);
+    await createDurchfuehrung(pool, { kursangebotId: ka.id, startDatum: '2027-03-01', endDatum: '2027-03-01', seminarnummer: '9500' });
+    const csv = [KOPF, 'Neu,Nina,nina@bank.test,,,,,9500,Kurs D,01.03.2027,0 / 16,05.10.2026,Buchung möglich,,'].join('\n');
+    const r = await importiereKursdatenBericht(pool, csv, 'ml');
+    expect(r.seminare[0]).toMatchObject({ neu: 0, bereitsVorhanden: 0 });
+    expect(r.seminare[0].fehler).toEqual([expect.objectContaining({ email: 'nina@bank.test', fehler: expect.stringMatching(/nimmt keine Anmeldungen an/) })]);
   });
 
   it('Route POST /integration/moodle/kursdaten nur fuer Admin', async () => {

@@ -1,6 +1,6 @@
 import type pg from 'pg';
-import { meldeAn, bestaetigeAnmeldung, setzeTeilnahme } from '../../repos/anmeldungRepo';
-import { ConflictError, ValidationError } from '../../domain/errors';
+import { meldeAn, bestaetigeAnmeldung, setzeTeilnahme, DoppelanmeldungError } from '../../repos/anmeldungRepo';
+import { ValidationError } from '../../domain/errors';
 import { csvObjekte } from '../../../tools/fm-import/csv';
 import {
   findeAnmeldungPerIdempotenz, findeAuftraggeberPerOrganisation, findeDurchfuehrungPerSeminarnummer, findeOrganisationPerName,
@@ -91,7 +91,8 @@ export async function importiereBuchungen(pool: pg.Pool, durchfuehrungId: string
         if (aktion === 'teilgenommen') await setzeTeilnahme(pool, r.anmeldung.id, 'teilgenommen', benutzer);
       }
     } catch (e) {
-      if (e instanceof ConflictError) { erg.bereitsVorhanden++; continue; }
+      // Nur die Doppelbuchung ist "bereits vorhanden"; andere Konflikte (z. B. Durchfuehrung nicht ausgeschrieben) sind Fehler.
+      if (e instanceof DoppelanmeldungError) { erg.bereitsVorhanden++; continue; }
       erg.fehler.push({ zeile: i + 2, email, fehler: (e as Error).message });
     }
   }
