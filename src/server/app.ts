@@ -7,6 +7,7 @@ import { registerProjektRoutes } from './routes/projekt';
 import { registerRechnungRoutes } from './routes/rechnung';
 import { registerDebitorRoutes } from './routes/debitor';
 import { registerPersonalRoutes } from './routes/personal';
+import { registerCrmRoutes } from './routes/crm';
 
 export function buildApp(pool: pg.Pool, opts: { auth?: AuthKonfig } = {}): FastifyInstance {
   const app = Fastify({ logger: false });
@@ -18,5 +19,6 @@ export function buildApp(pool: pg.Pool, opts: { auth?: AuthKonfig } = {}): Fasti
   registerRechnungRoutes(app, pool);
   registerDebitorRoutes(app, pool);
   registerPersonalRoutes(app, pool);
+  registerCrmRoutes(app, pool);
   return app;
 }
