@@ -1,5 +1,5 @@
 // REST-Routen Projektmanagement (Spec v2 §5.3). Lesen/Schreiben fuer alle Mitarbeitenden;
-// Admin-only: Zeit verrechnen, Abschluss mit force, Ueberbuchung erzwingen, Loeschen von Phasen/Meilensteinen.
+// Admin-only: Zeit und Spesen verrechnen, Abschluss mit force, Ueberbuchung erzwingen, Loeschen von Phasen/Meilensteinen.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { requireAdmin } from '../auth';
@@ -22,6 +22,7 @@ import {
   createZeiterfassung, getZeiterfassung, listZeiterfassung, updateZeiterfassung, deleteZeiterfassung, zeitVerrechnen,
 } from '../../repos/zeiterfassungRepo';
 import { createEinsatz, listEinsaetze, setEinsatzStatus } from '../../repos/einsatzRepo';
+import { createSpesen, listSpesen, deleteSpesen, spesenVerrechnen } from '../../repos/spesenRepo';
 import { findMitarbeitendeByKuerzel } from '../../repos/mitarbeitendeRepo';
 import { getCockpit, getPortfolio, getKanban, getGantt, getAuslastung } from '../../repos/pmAuswertungRepo';
 
@@ -83,6 +84,16 @@ export function registerPmRoutes(app: FastifyInstance, pool: pg.Pool): void {
     const b = body(req);
     const res = await zeitVerrechnen(pool, id(req), b, { benutzer: req.benutzer });
     return reply.code(b.rechnungId ? 200 : 201).send(res);
+  }));
+
+  // --- Spesen (Weiterverrechnung an den Kunden) ---
+  app.get('/projekt/:id/spesen', h(async (req) => listSpesen(pool, { projektId: id(req), offen: query(req).offen === 'true' })));
+  app.post('/projekt/:id/spesen', h(async (req, reply) =>
+    reply.code(201).send(await createSpesen(pool, { ...body(req), projektId: id(req) }, req.benutzer))));
+  app.delete('/spesen/:id', h(async (req, reply) => { await deleteSpesen(pool, id(req)); return reply.code(204).send(); }));
+  app.post('/projekt/:id/spesen-verrechnen', { preHandler: requireAdmin }, h(async (req, reply) => {
+    const b = body(req);
+    return reply.code(b.rechnungId ? 200 : 201).send(await spesenVerrechnen(pool, id(req), b, req.benutzer));
   }));
 
   // --- Phasen ---
