@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import type { Projekt } from '../domain/types';
 import { ValidationError, NotFoundError } from '../domain/errors';
+import type { Db } from './db';
 
 const map = (r: any): Projekt => ({
   id: r.id, nummer: r.nummer, stammnummer: r.stammnummer, jahr: r.jahr,
@@ -28,7 +29,7 @@ export async function createProjekt(pool: pg.Pool, input: {
   return map(r.rows[0]);
 }
 
-export async function getProjektById(pool: pg.Pool, id: string): Promise<Projekt> {
+export async function getProjektById(pool: Db, id: string): Promise<Projekt> {
   const r = await pool.query('select * from projekt where id=$1', [id]);
   if (!r.rowCount) throw new NotFoundError(`Projekt ${id} nicht gefunden`);
   return map(r.rows[0]);

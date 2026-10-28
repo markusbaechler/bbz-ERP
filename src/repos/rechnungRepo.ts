@@ -3,6 +3,7 @@ import type { Rechnung, Rechnungsposition } from '../domain/types';
 import { berechneMwst, rappenRunden } from '../domain/mwst';
 import { ValidationError, NotFoundError } from '../domain/errors';
 import { getProjektById } from './projektRepo';
+import type { Db } from './db';
 
 const mapR = (r: any): Rechnung => ({
   id: r.id, projektId: r.projekt_id, auftraggeberId: r.auftraggeber_id, datum: r.datum,
@@ -17,7 +18,7 @@ const mapP = (r: any): Rechnungsposition => ({
   mwstSatz: Number(r.mwst_satz), kontoId: r.konto_id, betragNetto: Number(r.betrag_netto),
 });
 
-export async function createRechnung(pool: pg.Pool, input: { projektId: string; auftraggeberId: string; datum: string; betreff?: string | null; mwstModus?: 'exkl' | 'inkl'; waehrung?: string }): Promise<Rechnung> {
+export async function createRechnung(pool: Db, input: { projektId: string; auftraggeberId: string; datum: string; betreff?: string | null; mwstModus?: 'exkl' | 'inkl'; waehrung?: string }): Promise<Rechnung> {
   const r = await pool.query(
     `insert into rechnung(projekt_id,auftraggeber_id,datum,betreff,mwst_modus,waehrung)
      values ($1,$2,$3,$4,coalesce($5,'exkl'),coalesce($6,'CHF')) returning *`,
@@ -25,18 +26,18 @@ export async function createRechnung(pool: pg.Pool, input: { projektId: string; 
   return mapR(r.rows[0]);
 }
 
-export async function getRechnung(pool: pg.Pool, id: string): Promise<Rechnung> {
+export async function getRechnung(pool: Db, id: string): Promise<Rechnung> {
   const r = await pool.query('select * from rechnung where id=$1', [id]);
   if (!r.rowCount) throw new NotFoundError(`Rechnung ${id} nicht gefunden`);
   return mapR(r.rows[0]);
 }
 
-export async function listPositionen(pool: pg.Pool, rechnungId: string): Promise<Rechnungsposition[]> {
+export async function listPositionen(pool: Db, rechnungId: string): Promise<Rechnungsposition[]> {
   const r = await pool.query('select * from rechnungsposition where rechnung_id=$1 order by position', [rechnungId]);
   return r.rows.map(mapP);
 }
 
-export async function recalcTotale(pool: pg.Pool, rechnungId: string): Promise<Rechnung> {
+export async function recalcTotale(pool: Db, rechnungId: string): Promise<Rechnung> {
   const rechnung = await getRechnung(pool, rechnungId);
   const pos = await listPositionen(pool, rechnungId);
   const e = berechneMwst(pos.map((p) => ({ betrag: p.betragNetto, satz: p.mwstSatz })), rechnung.mwstModus);
@@ -46,7 +47,7 @@ export async function recalcTotale(pool: pg.Pool, rechnungId: string): Promise<R
   return mapR(upd.rows[0]);
 }
 
-export async function addPosition(pool: pg.Pool, rechnungId: string, p: { beschreibung: string; menge: number; einheit?: string; einzelpreis: number; mwstSatz: number; kontoId?: string | null }): Promise<Rechnungsposition> {
+export async function addPosition(pool: Db, rechnungId: string, p: { beschreibung: string; menge: number; einheit?: string; einzelpreis: number; mwstSatz: number; kontoId?: string | null }): Promise<Rechnungsposition> {
   const rechnung = await getRechnung(pool, rechnungId);
   if (rechnung.status !== 'offen_prov' && rechnung.status !== 'def_vereinbart') {
     throw new ValidationError(`Positionen nur im Entwurf editierbar (Status ${rechnung.status})`);
