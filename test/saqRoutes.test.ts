@@ -81,6 +81,9 @@ describe('saq-routes', () => {
     expect((await post('/saq/fall', { kontakt: { email: 'a@b.test', nachname: 'A' }, profil: 'PK', sprache: 'ES' })).statusCode).toBe(400);
     expect((await app.inject({ method: 'GET', url: '/saq/fall/00000000-0000-0000-0000-000000000000' })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/saq/fall/kein-uuid' })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'GET', url: `/saq/fall/${liste[0].id}?stichtag=kaputt` })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'POST', url: '/saq/fall' })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'GET', url: '/saq/fall?limit=abc' })).statusCode).toBe(200);
 
     const f = (await post('/saq/fall', { kontakt: { email: 'patch@beispielbank.test', nachname: 'Patch' }, profil: 'KMU' })).json();
     const p = await app.inject({ method: 'PATCH', url: `/saq/fall/${f.id}`, payload: { kennzeichnung: 'VSM', status: 'abgebrochen' } });

@@ -178,7 +178,7 @@ export async function listSaqFaelle(db: Db, filter: SaqListeFilter = {}): Promis
     args.push(`%${filter.suche.trim().toLowerCase()}%`);
     cond.push(`(lower(k.nachname) like $${args.length} or lower(coalesce(k.vorname,'')) like $${args.length} or lower(coalesce(k.email,'')) like $${args.length})`);
   }
-  const limit = Math.min(filter.limit ?? 500, 5000);
+  const limit = Number.isFinite(filter.limit) ? Math.min(Math.max(Math.trunc(filter.limit as number), 1), 5000) : 500;
   // Mit Passiv-Filter wird erst nach der (fachlichen) Bewertung begrenzt.
   if (!filter.passiv) args.push(limit);
   const sql = `${LISTE_SQL} ${cond.length ? 'where ' + cond.join(' and ') : ''}
@@ -199,6 +199,7 @@ async function passerelleMoeglich(db: Db, fall: SaqFall): Promise<boolean> {
 
 /** Fallansicht: Stammdaten, Runs, Stand je Teilpruefung, Zulassung muendlich, Passerelle, Passiv und Hinweise. */
 export async function getSaqFall(db: Db, id: string, stichtag: string = heute()): Promise<SaqFallDetail> {
+  pruefeDatum(stichtag, 'stichtag');
   const r = await db.query(`${LISTE_SQL} where f.id=$2`, [stichtag, id]);
   if (!r.rowCount) throw new NotFoundError(`SAQ-Fall ${id} nicht gefunden`);
   const eintrag = mapListe(r.rows[0], stichtag);

@@ -23,7 +23,7 @@ export function registerSaqRoutes(app: FastifyInstance, pool: pg.Pool): void {
     } catch (e) { return sendError(reply, e); }
   });
   app.post('/saq/fall', async (req, reply) => {
-    try { return reply.code(201).send(await createSaqFall(pool, req.body as any, req.benutzer)); } catch (e) { return sendError(reply, e); }
+    try { return reply.code(201).send(await createSaqFall(pool, (req.body ?? {}) as any, req.benutzer)); } catch (e) { return sendError(reply, e); }
   });
   app.get('/saq/fall/:id', async (req, reply) => {
     const q = req.query as any;
