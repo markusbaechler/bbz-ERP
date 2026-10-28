@@ -7,7 +7,7 @@ import { createOrganisation } from '../src/repos/organisationRepo';
 import { createAuftraggeber } from '../src/repos/auftraggeberRepo';
 import { listAnmeldungen } from '../src/repos/anmeldungRepo';
 import { getKontakt } from '../src/repos/kontaktRepo';
-import { createDurchfuehrung, getDurchfuehrung, updateDurchfuehrung } from '../src/repos/durchfuehrungRepo';
+import { createDurchfuehrung, getDurchfuehrung, updateDurchfuehrung, setDurchfuehrungStatus } from '../src/repos/durchfuehrungRepo';
 import { liesBuchungenCsv, importiereKursdatenBericht } from '../src/integrations/moodle/buchungen';
 
 /*
@@ -86,13 +86,23 @@ describe('Moodle-Bericht "Anmeldungen Kursdaten V2"', () => {
     expect(r.seminare.map((s) => [s.neu, s.bereitsVorhanden])).toEqual([[0, 2], [0, 1]]);
   });
 
-  it('meldet eine abgelehnte Buchung als Fehler, nicht als "bereits vorhanden" (Durchfuehrung noch geplant)', async () => {
+  it('nimmt Buchungen auch fuer eine im ERP noch geplante Durchfuehrung an (Moodle ist der Buchungskanal)', async () => {
     const ka = await angebot(pool);
-    await createDurchfuehrung(pool, { kursangebotId: ka.id, startDatum: '2027-03-01', endDatum: '2027-03-01', seminarnummer: '9500' });
+    const geplant = await createDurchfuehrung(pool, { kursangebotId: ka.id, startDatum: '2027-03-01', endDatum: '2027-03-01', seminarnummer: '9500' });
     const csv = [KOPF, 'Neu,Nina,nina@bank.test,,,,,9500,Kurs D,01.03.2027,0 / 16,05.10.2026,Buchung möglich,,'].join('\n');
     const r = await importiereKursdatenBericht(pool, csv, 'ml');
+    expect(r.seminare[0]).toMatchObject({ neu: 1, bestaetigt: 1, fehler: [] });
+    expect((await listAnmeldungen(pool, { durchfuehrungId: geplant.id })).map((a) => a.status)).toEqual(['bestaetigt']);
+  });
+
+  it('meldet eine abgelehnte Buchung als Fehler, nicht als "bereits vorhanden" (Durchfuehrung abgesagt)', async () => {
+    const ka = await angebot(pool);
+    const d = await ausgeschrieben(pool, ka.id, { seminarnummer: '9501' });
+    await setDurchfuehrungStatus(pool, d.id, 'abgesagt');
+    const csv = [KOPF, 'Neu,Nora,nora@bank.test,,,,,9501,Kurs E,01.12.2026,0 / 16,05.10.2026,Buchung möglich,,'].join('\n');
+    const r = await importiereKursdatenBericht(pool, csv, 'ml');
     expect(r.seminare[0]).toMatchObject({ neu: 0, bereitsVorhanden: 0 });
-    expect(r.seminare[0].fehler).toEqual([expect.objectContaining({ email: 'nina@bank.test', fehler: expect.stringMatching(/nimmt keine Anmeldungen an/) })]);
+    expect(r.seminare[0].fehler).toEqual([expect.objectContaining({ email: 'nora@bank.test', fehler: expect.stringMatching(/nimmt keine Anmeldungen an/) })]);
   });
 
   it('Route POST /integration/moodle/kursdaten nur fuer Admin', async () => {

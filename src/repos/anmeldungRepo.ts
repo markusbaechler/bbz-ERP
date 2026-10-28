@@ -124,7 +124,8 @@ export async function meldeAn(db: Db, durchfuehrungId: string, input: MeldeAnInp
       if (quelle === 'homepage' && !(d.oeffentlich && d.angebotOeffentlich && d.angebotAktiv)) {
         throw new NotFoundError(`Durchfuehrung ${durchfuehrungId} nicht gefunden`);
       }
-      const offen = ANMELDUNG_OFFEN.includes(d.status) || (d.status === 'geplant' && quelle === 'manuell');
+      // Geplant: nur intern (manuell) und aus Moodle, dem Buchungskanal der Kurse; Homepage erst ab ausgeschrieben.
+      const offen = ANMELDUNG_OFFEN.includes(d.status) || (d.status === 'geplant' && (quelle === 'manuell' || quelle === 'moodle'));
       if (!offen) throw new ConflictError(`Durchfuehrung ${d.code} nimmt keine Anmeldungen an (Status ${d.status})`);
       if (quelle === 'homepage') {
         const frist = d.anmeldeschluss ?? d.startDatum;
