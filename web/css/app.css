@@ -43,6 +43,7 @@
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; min-height: 100vh; }
 h1, h2, h3 { margin: 0; line-height: 1.25; }
+address { font-style: normal; margin: 0; }
 a { color: var(--blue); }
 button, input, select, textarea { font-family: inherit; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
@@ -392,11 +393,16 @@ a.bbz-kpi:hover { background: var(--blue-soft); border-color: var(--blue-line); 
 .bbz-legend .lg-review { background: #c98a00; }
 .bbz-legend .lg-erledigt { background: var(--green); }
 .bbz-gantt { color: var(--muted); }
+.bbz-legend .lg-h1 { background: #b9d2ea; }
+.bbz-legend .lg-h2 { background: var(--blue-mid); }
+.bbz-legend .lg-h3 { background: var(--red); }
+.bbz-legend .lg-we { background: #e9edf2; }
 
 /* HEATMAP */
 .bbz-heat-wrap { overflow-x: auto; }
 .bbz-heat { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
 .bbz-heat th { font-weight: 600; color: var(--subtle); font-size: 10px; padding: 2px; text-align: center; white-space: nowrap; }
+.bbz-heat th.heute { color: var(--blue); box-shadow: inset 0 -2px 0 var(--blue); }
 .bbz-heat th.name { text-align: left; color: var(--text-2); font-size: 12px; padding-right: 8px; position: sticky; left: 0; background: var(--panel); z-index: 1; }
 .bbz-heat td { width: 22px; min-width: 22px; height: 22px; border-radius: 4px; background: var(--line-2); text-align: center; font-size: 9px; color: transparent; }
 .bbz-heat td.we { background: #e9edf2; }
