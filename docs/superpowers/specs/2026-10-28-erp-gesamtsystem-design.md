@@ -174,6 +174,8 @@ Fachmodell und Begriffe übernommen aus **bbz-saq / Reporting KUBA** [belegt: bb
 | `POST /saq/pruefung/:id/resultat {resultatProzent?, score?, bestanden?}` | Run 3 nicht bestanden → Vorgang nicht bestanden; alle Pflichtteile schriftlich bestanden → `schriftlich_bestanden`; OE bestanden → `bestanden` |
 | `POST /saq/fall/:id/zertifikat {zertifikatNr, ausgestelltAm}` | → `zertifizierung` (3 Jahre) → Rezertifizierungsfrist läuft |
 | `GET /saq/kennzahlen?jahr` | Vorgänge, Bestehensquote (Nenner = abgeschlossene Vorgänge), Erstversuch-Quoten, Ø Resultat; immer mit n |
+| `POST /saq/fall/:id/verrechnen {datum, projektId, preisChf?}` (Admin) | Rechnung an die Bank: Listenpreis je Profil (PK 2'025 … CCoB 3'625), Remote-Aufpreis CHF 300, MWSt-Normalsatz [belegt: Website] |
+| `POST /saq/fall/:id/stornieren {datum, grund, arztzeugnis?, projektId?}` | AGB: > 30 Tage frei, bis 11 Arbeitstage CHF 300, darunter voller Preis (Arztzeugnis: CHF 300), ohne schriftliche Prüfung mind. CHF 150 |
 | `GET /saq/export/kuba` | Export im Feldschema von bbz-saq (`we1.run1.result` …). Damit kann das Cockpit das ERP statt der Excel-Datei lesen |
 
 ### 5.5 Finanzen (v1 + Erweiterungen)
