@@ -1,7 +1,10 @@
+import type pg from 'pg';
 import type { Projekt } from '../domain/types';
 import type { ProjektStatus } from '../domain/pmTypes';
+import { pruefeStatusWechsel } from '../domain/projektStatus';
 import { ValidationError, NotFoundError, ConflictError } from '../domain/errors';
-import { type Db, patchSets, num } from './db';
+import { type Db, inTransaktion, patchSets, num } from './db';
+import { audit } from './auditRepo';
 
 const map = (r: any): Projekt => ({
   id: r.id, nummer: r.nummer, stammnummer: r.stammnummer, jahr: r.jahr,
@@ -131,4 +134,27 @@ export async function fortsetzeProjekt(db: Db, id: string, jahr: number): Promis
     if ((e as { code?: string })?.code === '23505') throw new ConflictError(`Projekt ${alt.stammnummer}.${String(jahr).slice(-2)} existiert bereits`);
     throw e;
   }
+}
+
+/**
+ * Statuswechsel (Spec §5.3) transaktional mit Zeilensperre und Audit-Log. Abschluss ist blockiert (409), solange
+ * verrechenbare, unverrechnete Zeiteintraege existieren; `force` uebersteuert (Admin-Pruefung beim Aufrufer).
+ */
+export async function setProjektStatus(pool: pg.Pool, id: string, nach: ProjektStatus,
+  opts: { force?: boolean; benutzer?: string | null } = {}): Promise<Projekt> {
+  return inTransaktion(pool, async (c) => {
+    const r = await c.query('select status from projekt where id=$1 for update', [id]);
+    if (!r.rowCount) throw new NotFoundError(`Projekt ${id} nicht gefunden`);
+    const von: ProjektStatus = r.rows[0].status;
+    const z = await c.query(
+      'select count(*)::int as n from zeiterfassung where projekt_id=$1 and verrechenbar and rechnungsposition_id is null', [id]);
+    const unverrechneteEintraege: number = z.rows[0].n;
+    const { forciert } = pruefeStatusWechsel({ von, nach, unverrechneteEintraege, force: opts.force === true });
+    const u = await c.query('update projekt set status=$2, geaendert_am=now() where id=$1 returning *', [id, nach]);
+    await audit(c, {
+      benutzer: opts.benutzer, aktion: 'status', entitaet: 'projekt', entitaetId: id,
+      details: { von, nach, forciert, unverrechneteEintraege },
+    });
+    return map(u.rows[0]);
+  });
 }
