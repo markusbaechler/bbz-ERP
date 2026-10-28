@@ -20,10 +20,15 @@ import { registerBildungRoutes } from './routes/bildung';
 import { registerSaqRoutes } from './routes/saq';
 import { registerMahnwesenRoutes } from './routes/mahnwesen';
 
-export type AppOptionen = { auth?: AuthKonfig; integration?: Partial<WorkerDeps>; publicLimits?: { lesenProMinute?: number; schreibenProMinute?: number } };
+export type AppOptionen = {
+  auth?: AuthKonfig; integration?: Partial<WorkerDeps>; publicLimits?: { lesenProMinute?: number; schreibenProMinute?: number };
+  /** Wird fuer jede registrierte Route aufgerufen (Dokumentation: npm run api:routen). */
+  beiRoute?: (methode: string, url: string) => void;
+};
 
 export function buildApp(pool: pg.Pool, opts: AppOptionen = {}): FastifyInstance {
   const app = Fastify({ logger: false });
+  if (opts.beiRoute) app.addHook('onRoute', (r) => { for (const m of [r.method].flat()) opts.beiRoute!(m, r.url); });
   registriereAuth(app, pool, opts.auth ?? authKonfigAusEnv());
   registrierePublicSchutz(app, pool, opts.publicLimits);
   // Integrationsabhaengigkeiten erst bei Bedarf aus der Umgebung lesen (Tests injizieren Fakes)
