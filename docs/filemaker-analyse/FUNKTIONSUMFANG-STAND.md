@@ -73,7 +73,7 @@ Offen bleibt, was nur der DDR zeigt: Feldtypen, Formeln (z. B. Rechnungstotal, V
 
 ## 5. Nächster Schritt
 Alle Lücken, die noch in Gebrauch sind, sind geschlossen und in der PWA bedienbar (Stand 28.10.2026). Offen bleiben:
-1. In Moodle die Spalte **Bank** im Bericht „Anmeldungen Kursdaten V2“ ergänzen und in den Durchführungen die **Seminarnummer** erfassen; danach den ersten Import fahren.
+1. In den Durchführungen die **Seminarnummer** erfassen; danach den ersten Import fahren. Die Spalte **Bank** im Moodle-Bericht „Anmeldungen Kursdaten V2“ ist ergänzt (28.10.2026).
 2. Moodle-Web-Services und Token bei cometas (Einschreibung, Abschluss-Sync) – braucht Website-Administration.
 3. Erster echter FileMaker-Export (`MIGRATION.md`) mit `mapping.bbz.json`: Kopfzeilen prüfen, `rechnungen.totalBrutto` ergänzen, Probelauf.
 4. Bei Zugang mit [Vollzugriff]: DDR nachziehen (Weg A).

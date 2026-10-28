@@ -91,7 +91,7 @@ Wichtige Umgebungsvariablen: `.env.example`.
    - Briefe, Erinnerungen, Feedback, Zertifikate und Statistik laufen in Moodle.
    - Schlüssel zum ERP ist die Seminarnummer der Face-to-Face-Termine.
    - Der Buchungsimport soll den Bericht „Anmeldungen Kursdaten V2“ lesen (Grundlage der Sammelrechnung).
-   - Offen: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`). Im Bericht die Spalte Bank ergänzen.
+   - Offen: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`). Die Spalte Bank im Bericht ist ergänzt (28.10.2026).
 4. **Zapier**: Die Zaps von SharePoint auf `/public/v1/formulare/<formular>` umstellen und die Feldnamen gegen das Mapping prüfen (`src/integrations/formulare.ts`, `ALIASE`).
 5. **Entra ID**: App-Registrierung für API (Audience) und PWA (SPA) anlegen und die App-Rolle `bbz.admin` vergeben. In `web/config.js` `authMode: 'entra'` setzen.
 6. **KUBA-Import** mit der echten `Reporting_KUBA.xlsx` als Probelauf ausführen (`npm run kuba:import -- --datei …`). Status je Profil mit dem bbz-saq-Cockpit abgleichen. Offene Fragen:
