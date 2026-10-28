@@ -35,13 +35,13 @@ Die Lösung („IGK-Kurs-Informations-System“ / MacOffice, Entwickler INCON) b
 | 7 | Mandant **IGK** (Faktura igk/bbz, Mandant im Debitor) | **entfällt** | IGK ist nicht mehr aktiv und ins bbz integriert [belegt: Auskunft Fachseite]. Ein Kreditor genügt (`src/config/creditor.ts`) |
 | 8 | Preisstufen **IGK/fremd**, BAG-Zuschlag, Vorauszahlung, *Preise aktualisieren* | **entfällt** | IGK-Mechanik; die Kursabwicklung liegt im LMS [belegt: Auskunft Fachseite]. Allgemeine „Preisregeln für Bankengruppen“ bleiben ein eigener Punkt (v2.1) |
 | 9 | Spesen/Honorar in Rechnungspositionen (*Spesen Importieren*, *Import Spesen*) | **offen – zu bauen** | In Gebrauch [belegt: Auskunft Fachseite]. Honorare je Einsatz vorhanden, Spesen fehlen |
-| 10 | Briefe Einladung, Vorgesetzteninfo, Transferbrief, Teilnahmebestätigung/Diplom, Serien-/Kurzbrief mit Textvorlagen | **entfällt** | Im LMS abgedeckt [belegt: Auskunft Fachseite]. Im ERP bleiben die Mail-Vorlagen Bestätigung, Warteliste, Nachrücken, Mahnung |
-| 11 | *Seminarbeurteilung*, *Kursbeurteilung*, *Referenten Feedback* | **entfällt** | Im LMS abgedeckt [belegt: Auskunft Fachseite] |
+| 10 | Briefe Einladung, Vorgesetzteninfo, Transferbrief, Teilnahmebestätigung/Diplom, Serien-/Kurzbrief mit Textvorlagen | **entfällt** | Im LMS abgedeckt [belegt: Auskunft Fachseite; Moodle-Analyse: Face-to-Face-Benachrichtigungen, Remindplus, `tool_certificate`, `docs/integration/MOODLE.md` §5]. Im ERP bleiben die Mail-Vorlagen Bestätigung, Warteliste, Nachrücken, Mahnung |
+| 11 | *Seminarbeurteilung*, *Kursbeurteilung*, *Referenten Feedback* | **entfällt** | Im LMS abgedeckt [belegt: Auskunft Fachseite; Moodle-Analyse: Feedback-Aktivität in 33 von 64 Kursen] |
 | 12 | *Rechnung Mail* (PDF + Leistungsblatt per E-Mail) | **offen – zu bauen** | In Gebrauch [belegt: Auskunft Fachseite]. Die Mail-Outbox kennt keine Anhänge; das PDF lässt sich bisher nur herunterladen (`GET /rechnung/:id/pdf`) |
 | 13 | *print Lieferschein*, Artikelpositionen (Art. Nr.), *Etiketten Führungshandbuch* | **entfällt** | Nicht mehr in Gebrauch [belegt: Auskunft Fachseite] |
 | 14 | Wochenplan als Druck | **entfällt** | Einsatzliste je Zeitraum und Auslastungs-Heatmap; Druck über den Browser |
 | 15 | *Export für AGKB* (DBF/TXT von Kurstypen, Seminaren, Referenten) | **entfällt** | Das DBF-Format ist veraltet. Kurse, Durchführungen und Referenten stehen als REST-API und Webhooks bereit |
-| 16 | *Kursstatistik*, *Ausbildungsbedarf* | **entfällt** | Im LMS abgedeckt [belegt: Auskunft Fachseite]; im ERP Belegung je Durchführung und SAQ-Kennzahlen |
+| 16 | *Kursstatistik*, *Ausbildungsbedarf* | **entfällt** | Im LMS abgedeckt [belegt: Auskunft Fachseite; Moodle-Analyse: Berichtsgenerator mit Anmeldeständen, Stornierungen, Warteliste]; im ERP Belegung je Durchführung und SAQ-Kennzahlen |
 | 17 | Filialen je Bank | **teilweise** | `organisation.gruppe_id` im Schema, noch ohne Oberfläche |
 | 18 | PLZ-Verzeichnis | **entfällt** | PLZ/Ort werden direkt erfasst; eine Nachschlagetabelle ist für die Ablösung nicht nötig |
 | 19 | Fax | **entfällt** | nicht mehr im Einsatz [Hypothese] |
@@ -72,8 +72,8 @@ Feldzuordnung für die Datenmigration: `tools/fm-import/mapping.bbz.json` (Feldn
 Offen bleibt, was nur der DDR zeigt: Feldtypen, Formeln (z. B. Rechnungstotal, Vergleichszahl der Doublettenkontrolle), Beziehungen, Wertelisten und die gesperrten Scripts. Sobald ein Konto mit [Vollzugriff] verfügbar ist (Entwickler INCON oder Server-Administration [Hypothese]), ergänzt Weg A das Bild in rund 2 Minuten. Dann: `npm run fm:analyse -- "%USERPROFILE%\Documents\bbz-DDR"`.
 
 ## 5. Nächster Schritt
-1. Die drei Lücken bauen, die noch in Gebrauch sind: Sammelrechnung je Bank (6), Rechnung per Mail mit PDF (12), Spesen weiterverrechnen (9).
+1. Die drei Lücken bauen, die noch in Gebrauch sind: Sammelrechnung je Bank (6), Rechnung per Mail mit PDF (12), Spesen weiterverrechnen (9). Die Sammelrechnung braucht die Buchungen aus Moodle: Import des Berichts „Anmeldungen Kursdaten V2“ mit Zuordnung über die Seminarnummer (`docs/integration/MOODLE.md` §5).
 2. PWA-Oberfläche für camt.054-Import, Kontenauswertung und Anmeldungen je Institut.
-3. Moodle (LMS) gegen das ERP abgleichen: Was dort abgedeckt ist (Briefe, Beurteilung, Statistik), baut das ERP nicht nach; die Schnittstelle (Einschreibung, Abschluss) muss dazu passen.
+3. Moodle ist abgeglichen (28.10.2026, `docs/integration/MOODLE.md` §5). Offen: Web-Services und Token (braucht Website-Administration bzw. cometas), Spalte Bank im Bericht.
 4. Erster echter Export (`MIGRATION.md`) mit `mapping.bbz.json`: Kopfzeilen prüfen, `rechnungen.totalBrutto` ergänzen, Probelauf.
 5. Bei Zugang mit [Vollzugriff]: DDR nachziehen (Weg A).

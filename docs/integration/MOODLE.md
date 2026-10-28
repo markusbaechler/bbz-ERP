@@ -33,3 +33,25 @@ Die Zuordnung Session ↔ Durchführung läuft über `durchfuehrung.moodle_sessi
 ## 4. Offene Punkte mit cometas
 - Bietet das Face-to-Face-Plugin Web-Service-Funktionen für Sessions und Signups? Falls ja, wird der CSV-Import durch einen automatischen Abgleich ersetzt (`/integration/moodle/status` listet die Funktionen).
 - Bewertungen sind laut Audit kursweit ausgeschaltet. Sobald Lernkontrollen ins Bewertungsbuch schreiben, kann das ERP Resultate übernehmen (`gradereport_user_get_grade_items`).
+- Web-Services, Token und Funktionsliste konnten am 28.10.2026 nicht geprüft werden (Konto ohne Website-Administration, §5).
+
+## 5. Ist-Stand cometas (Analyse 28.10.2026, nur lesend)
+Zugang mit Kurs-Manager-Rechten, **ohne** Website-Administration: Plugins, Webservices und Konfiguration waren nicht einsehbar [belegt: Moodle meldet „nopermissions“]. Keine Teilnehmerdaten gelesen oder exportiert.
+
+| Bereich | Befund |
+|---|---|
+| Kursbereiche | Nachwuchsbildung, SAQ-Zertifizierung (Unterbereich Raiffeisen), Tailormade (BEKB, GKB, GLKB, UNO, BSD, Migros Bank, Clientis, SGKB), Weiterbildung (44 Kurse), Prüfungen (28), bbz intern, Testing, ZugerKB, Zentrale Fragendatenbank [belegt: Kursbereiche] |
+| Aktivitäten (Stichprobe 64 Kurse) | Face-to-Face in 52 Kursen; Feedback in 33; `cometascreator` (Lerninhalte von cometas) in 43 Kursen mit 500 Instanzen; Quiz 9; SCORM 3; H5P 1; dazu Seiten, Dateien, Links [belegt: Kursstruktur] |
+| Face-to-Face-Termine | Eigene Felder **Veranstaltungsort**, **Seminarnummer**, Bemerkungen; Kapazität, Stand („Ausgebucht“, „Buchung möglich“), Warteliste. Die Buchung fragt nur die Benachrichtigungsart ab (E-Mail/iCalendar) [belegt: Termin- und Buchungsseite]. Die Seminarnummern (z. B. 8961, 9045) setzen die Nummernfolge der FileMaker-„Seminar Nr.“ fort [Hypothese] |
+| Profilfelder (Selbstregistrierung) | Pflicht: Bank (Liste Schweizer Banken + „Andere“), Profil (Privatkunden, Individualkunden, Affluent, CWMA, KMU, CCoB, Andere), Funktion, Telefon, Geburtsdatum; dazu Sprache (DE/FR/IT), Geschäftsadresse, AGB-Zustimmung. Im Bericht zusätzlich „Rechnungsadresse (falls abweichend von Geschäftsadresse)“ [belegt: Registrierungsformular, Berichtsspalten] |
+| Einschreibung (Beispielkurs) | Manuelle Einschreibung aktiv, Selbsteinschreibung, Gastzugang [belegt: Einschreibemethoden] |
+| Zertifikate | `tool_certificate` („Meine Zertifikate“); `customcert` nicht installiert [belegt] |
+| Berichte (Berichtsgenerator) | Anmeldungen Kursdaten (V1/V2), Stornierungen (V1/V2), Facetoface Warteliste, Anmeldestände, Anmeldungen SAQ mündlich/schriftlich, Prüfungsanmeldungen PC-/FK-Zertifizierung, Remindplus (Erinnerungen), Neue Registrierungen, Weihnachtskarte [belegt: Berichtsliste] |
+| Spalten „Anmeldungen Kursdaten V2“ | Nachname, Vorname, E-Mail, Funktion, Telefon, Geschäftsadresse, Rechnungsadresse (falls abweichend), Seminarnummer, Kursname, Beginn, Booked/Capacity, Erstellungsdatum, Session status, Profil – **keine Spalte Bank** [belegt: Berichtskopf] |
+
+### Folgerungen für das ERP
+1. Kursbriefe und Erinnerungen (Face-to-Face-Benachrichtigungen, Remindplus), Beurteilung (Feedback), Teilnahmebestätigungen (`tool_certificate`) und Kursstatistik (Berichtsgenerator) laufen in Moodle. Das ERP baut sie nicht nach (FileMaker-Lücken 10, 11, 16).
+2. Der fachliche Schlüssel zwischen Moodle und ERP ist die **Seminarnummer** des Face-to-Face-Termins. Das ERP ordnet heute über `durchfuehrung.moodle_session_id` zu; die Seminarnummer gehört in die Durchführung und in den Import.
+3. Buchungsimport: `src/integrations/moodle/buchungen.ts` liest heute die Teilnehmerliste **eines** Termins (E-Mail, Vorname, Nachname, Status). Gelebt wird der Bericht „Anmeldungen Kursdaten V2“ über **alle** Termine, mit Seminarnummer, Funktion, Telefon, Geschäfts- und Rechnungsadresse und Profil. Der Import soll dieses Format lesen und über die Seminarnummer zuordnen.
+4. Sammelrechnung je Bank: Rechnungsempfänger aus Rechnungsadresse bzw. Bank. Die Bank fehlt im Bericht als Spalte; sie ist im Bericht zu ergänzen (bbz/cometas) [offen].
+5. Moodle erhebt das Geburtsdatum als Pflichtfeld. Das ERP übernimmt es nur, wo es fachlich nötig ist (nDSG, Datensparsamkeit).
