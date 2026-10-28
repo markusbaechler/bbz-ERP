@@ -65,3 +65,16 @@ export const SAQ = {
   /** Spaltenraster der KUBA-Datei (bbz-saq CONFIG.we / CONFIG.oe) fuer den Export. */
   kuba: { we: { teile: 6, runs: 3 }, oe: { teile: 2, runs: 3 } },
 };
+
+/**
+ * Verrechnung SAQ [belegt: Website /zertifizierung/, AGB]: Listenpreis je Profil exkl. MWST (-> Normalsatz),
+ * Remote-Pruefung CHF 300 Aufpreis; die Anmeldung loest die Rechnung an die Bank aus (Einwilligung im Formular).
+ * Annullation Pruefung [belegt: AGB]: 30 Tage bis 11 Arbeitstage vorher CHF 300; ab 10 Arbeitstagen voller Preis
+ * (mit Arztzeugnis CHF 300); Abmeldung ohne absolvierte schriftliche Pruefung: Administrationsgebuehr CHF 150.
+ * Kombination der Gebuehren [Hypothese]: es gilt der hoehere Betrag (keine Doppelbelastung).
+ */
+export const SAQ_VERRECHNUNG = {
+  mwstSatz: 8.1,
+  remoteAufpreisChf: 300,
+  annullation: { freiMehrAlsTage: 30, pauschalChf: 300, vollerPreisAbArbeitstagen: 10, administrationChf: 150 },
+} as const;

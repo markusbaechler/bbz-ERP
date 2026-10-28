@@ -22,6 +22,27 @@ export const ANNULLATION_OEFFENTLICH: readonly AnnullationsStufe[] = [
   { mehrAlsTageVorBeginn: Number.NEGATIVE_INFINITY, prozent: 100 },
 ];
 
+/**
+ * Kundenspezifische Projekte / Firmenkurse [belegt: AGB bbz, Oktober 2026]: bis 90 Tage vorher kostenlos;
+ * 89-60 Tage 30 %, 59-30 Tage 50 %, ab 29 Tagen 100 % (Annullation; Verschiebung jeweils 10 %, hier nicht modelliert).
+ */
+export const ANNULLATION_PROJEKT: readonly AnnullationsStufe[] = [
+  { mehrAlsTageVorBeginn: 89, prozent: 0 },
+  { mehrAlsTageVorBeginn: 59, prozent: 30 },
+  { mehrAlsTageVorBeginn: 29, prozent: 50 },
+  { mehrAlsTageVorBeginn: Number.NEGATIVE_INFINITY, prozent: 100 },
+];
+
+/** Ohne Annullationskosten (z. B. interne Anlaesse, kostenlose Foren). */
+export const ANNULLATION_KEINE: readonly AnnullationsStufe[] = [{ mehrAlsTageVorBeginn: Number.NEGATIVE_INFINITY, prozent: 0 }];
+
+/** Staffel je Kursangebot (`kursangebot.annullationsregel`). SAQ-Pruefungen rechnen im SAQ-Modul (fixe Betraege). */
+export function staffelFuer(regel: string | null | undefined): readonly AnnullationsStufe[] {
+  if (regel === 'projekt') return ANNULLATION_PROJEKT;
+  if (regel === 'keine') return ANNULLATION_KEINE;
+  return ANNULLATION_OEFFENTLICH;
+}
+
 /** SAQ-Rezertifizierung: 24 Lernstunden innerhalb der 36-monatigen Gueltigkeit [belegt: /rezertifizierung/]. */
 export const REZERTIFIZIERUNG = { lernstundenSoll: 24, gueltigkeitMonate: 36 } as const;
 

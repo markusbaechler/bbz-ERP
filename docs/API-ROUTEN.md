@@ -1,6 +1,6 @@
 # API-Routen (generiert)
 
-Stand: 2026-10-28 · 156 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
+Stand: 2026-10-28 · 158 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
 
 ## Administration & Integration
 
@@ -195,6 +195,8 @@ Stand: 2026-10-28 · 156 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `PATCH` | `/saq/fall/:id` |
 | `POST` | `/saq/fall/:id/arbeitgeberbestaetigung` |
 | `POST` | `/saq/fall/:id/pruefung` |
+| `POST` | `/saq/fall/:id/stornieren` |
+| `POST` | `/saq/fall/:id/verrechnen` |
 | `POST` | `/saq/fall/:id/zertifikat` |
 | `GET` | `/saq/kennzahlen` |
 | `PATCH` | `/saq/pruefung/:id` |

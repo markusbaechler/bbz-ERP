@@ -109,20 +109,21 @@ export async function getDurchfuehrungBasis(db: Db, id: string): Promise<Durchfu
 /** Durchfuehrung inkl. Angebotsdaten, gesperrt bis Transaktionsende (serialisiert Anmeldungen/Storni/Verrechnung). */
 export type GesperrteDurchfuehrung = Durchfuehrung & {
   angebotPreisChf: number | null; lernstunden: number | null; mwstSatz: number; ertragskontoId: string | null;
-  angebotOeffentlich: boolean; angebotAktiv: boolean;
+  angebotOeffentlich: boolean; angebotAktiv: boolean; annullationsregel: string;
 };
 
 export async function sperreDurchfuehrung(c: Db, id: string): Promise<GesperrteDurchfuehrung> {
   // "no key update": serialisiert Fachoperationen untereinander, blockiert aber keine FK-Pruefungen (Kurstage etc.).
   const r = await c.query(
     `select d.*, k.code as angebot_code, k.titel as angebot_titel, k.preis_chf as angebot_preis, k.lernstunden,
-            k.mwst_satz, k.ertragskonto_id, k.oeffentlich as angebot_oeffentlich, k.aktiv as angebot_aktiv
+            k.mwst_satz, k.ertragskonto_id, k.oeffentlich as angebot_oeffentlich, k.aktiv as angebot_aktiv, k.annullationsregel
      from durchfuehrung d join kursangebot k on k.id=d.kursangebot_id where d.id=$1 for no key update of d`, [id]);
   if (!r.rowCount) throw new NotFoundError(`Durchfuehrung ${id} nicht gefunden`);
   const x = r.rows[0];
   return {
     ...mapD(x), angebotPreisChf: num(x.angebot_preis), lernstunden: num(x.lernstunden), mwstSatz: Number(x.mwst_satz),
     ertragskontoId: x.ertragskonto_id, angebotOeffentlich: x.angebot_oeffentlich, angebotAktiv: x.angebot_aktiv,
+    annullationsregel: x.annullationsregel ?? 'oeffentlich',
   };
 }
 

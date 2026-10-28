@@ -3,6 +3,7 @@ import type { Anmeldung, Lernnachweis, TeilnahmeStatus } from '../domain/bildung
 import { ANMELDUNG_OFFEN, STORNIERBAR, pruefeTeilnahmeStatus } from '../domain/bildungTypes';
 import type { Kontakt } from '../domain/types';
 import { annullationsgebuehr } from '../domain/annullation';
+import { staffelFuer } from '../config/bildung';
 import { heuteIso, pruefeDatum, datumInZuerich } from '../domain/kursplanung';
 import { ValidationError, NotFoundError, ConflictError } from '../domain/errors';
 import { type Db, patchSets, num } from './db';
@@ -229,7 +230,7 @@ export async function storniereAnmeldung(db: Db, id: string, input: StornoInput,
       await pruefeKeineDoppelanmeldung(c, d.id, ersatzKontakt.id);
     }
     const gebuehr = input.stornogebuehrChf
-      ?? (ersatzKontakt || a.status === 'warteliste' ? 0 : annullationsgebuehr(num(a.preis_chf), d.startDatum, datum).gebuehrChf);
+      ?? (ersatzKontakt || a.status === 'warteliste' ? 0 : annullationsgebuehr(num(a.preis_chf), d.startDatum, datum, staffelFuer(d.annullationsregel)).gebuehrChf);
     await c.query(
       `update anmeldung set status='storniert', storniert_am=now(), stornogrund=$2, stornogebuehr_chf=$3, wartelisten_position=null
        where id=$1`, [id, input.grund.trim(), gebuehr]);

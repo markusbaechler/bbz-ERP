@@ -19,6 +19,7 @@ import { registerPmRoutes } from './routes/pm';
 import { registerBildungRoutes } from './routes/bildung';
 import { registerSaqRoutes } from './routes/saq';
 import { registerMahnwesenRoutes } from './routes/mahnwesen';
+import { registerSaqVerrechnungRoutes } from './routes/saqVerrechnung';
 
 export type AppOptionen = {
   auth?: AuthKonfig; integration?: Partial<WorkerDeps>; publicLimits?: { lesenProMinute?: number; schreibenProMinute?: number };
@@ -53,5 +54,6 @@ export function buildApp(pool: pg.Pool, opts: AppOptionen = {}): FastifyInstance
   registerBildungRoutes(app, pool);
   registerSaqRoutes(app, pool);
   registerMahnwesenRoutes(app, pool);
+  registerSaqVerrechnungRoutes(app, pool);
   return app;
 }
