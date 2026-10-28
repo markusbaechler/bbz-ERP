@@ -66,6 +66,13 @@ Wichtige Umgebungsvariablen: `.env.example`.
 | Migration | `tools/fm-analyse` (DDR), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie) | ✅ / siehe unten |
 | Frontend | `web/` (PWA unter `/app/`) | siehe unten |
 
+## Sicherheit (Review 28.10.2026, alle Befunde behoben, Tests: `test/sicherheit.test.ts`)
+- Die öffentliche API läuft pro Request auf **einer** DB-Verbindung (Idempotenz-Sperre + Fachlogik + Savepoint). Pool-Timeouts sind gesetzt (`PG_*`).
+- Neutrale Antworten (kein Teilnahme-Orakel). Bestehende Kontakte werden nie aus anonymen Eingaben geändert. Steuerzeichen → 400. Generischer 500-Handler.
+- Rate-Limit je Schlüssel **und** IP (`TRUST_PROXY` hinter Azure setzen).
+- Entra-oid-Bindung wird erzwungen. Webhooks: kein SSRF (interne IPs, DNS, Redirects).
+- Storno erzeugt einen **Storno-Beleg (Gutschrift)** mit eigener lückenloser Nummer und gespiegelten Beträgen.
+
 ## Offene Punkte / nächste Schritte
 1. **FileMaker-DDR liefern** (Werkzeuge → Datenbank-Designreport → XML). Danach `npm run fm:analyse -- <Ordner>` ausführen und die Lücken aus Kapitel 9 schliessen.
 2. **Echte Exporte migrieren** gemäss `docs/filemaker-analyse/MIGRATION.md`: Probelauf, Summenabgleich, `--zaehler-start` = nächste FM-RgNr.
@@ -79,7 +86,10 @@ Wichtige Umgebungsvariablen: `.env.example`.
    - Annullationsstaffeln für SAQ und Projekte (aktuell nur „öffentlich“ produktiv).
 7. v2.1:
    - camt.054-Import
-   - Gutschrift bei Storno nach Verrechnung
+   - Rückerstattung von Zahlungen auf stornierte Rechnungen (heute nur im Audit-Log)
    - Preisregeln für Bankengruppen und Staffelpreise
    - `rechnung.durchfuehrung_id`
    - Briefvorlagen-Editor (Serienbriefe)
+   - Captcha im Widget
+   - Rate-Limit verteilt (Redis), wenn mehrere Instanzen laufen
+   - bbz-saq-Cockpit auf `GET /saq/export/kuba` umstellen statt Excel
