@@ -1,6 +1,7 @@
 /**
  * CRM-Auswertungen (nur lesend): 360°-Sichten, Wiedervorlagen, Dashboard.
  * Liest Tabellen anderer Module (aufgabe, projekt, rechnung, anmeldung, lernnachweis, zertifizierung) per SQL.
+ * Sichten mit parallelen Abfragen verlangen einen Pool (kein Transaktions-Client: pg verbietet parallele Queries je Client).
  */
 import type pg from 'pg';
 import type {
@@ -60,7 +61,7 @@ export async function ladeOrganisation360(pool: pg.Pool, id: string): Promise<Or
   };
 }
 
-export async function ladeKontakt360(db: Db, id: string): Promise<Kontakt360> {
+export async function ladeKontakt360(db: pg.Pool, id: string): Promise<Kontakt360> {
   const kontakt = await getKontakt(db, id);
   const [organisation, aktivitaeten, aufgaben, verkaufschancen, anmeldungen, lernnachweise, zertifizierungen] = await Promise.all([
     kontakt.organisationId ? getOrganisation(db, kontakt.organisationId) : Promise.resolve(null),
@@ -107,7 +108,7 @@ export async function ladeWiedervorlagen(db: Db, filter: { stichtag: string; mit
  * CRM-Dashboard zum Stichtag. `mitarbeitendeId` schraenkt Wiedervorlagen (zustaendig) und Pipeline (verantwortlich) ein;
  * Anfragen, Aktivitaeten und Pflegeabdeckung sind gesamthaft. Zeitfenster in Kalendertagen (Europe/Zurich) inkl. Stichtag.
  */
-export async function ladeCrmDashboard(db: Db, filter: { stichtag: string; mitarbeitendeId?: string }): Promise<CrmDashboard> {
+export async function ladeCrmDashboard(db: pg.Pool, filter: { stichtag: string; mitarbeitendeId?: string }): Promise<CrmDashboard> {
   const { stichtag, mitarbeitendeId } = filter;
   const fenster = (tage: number) => `a.datum >= ${tagesbeginn(`$1::date - ${tage - 1}`)} and a.datum < ${tagesbeginn('$1::date + 1')}`;
   const pipelineArgs: unknown[] = mitarbeitendeId ? [mitarbeitendeId] : [];
