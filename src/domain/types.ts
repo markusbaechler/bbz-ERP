@@ -41,6 +41,7 @@ export type Rechnung = {
 export type Zahlungseingang = {
   id: string; rechnungId: string; datum: string; betrag: number;
   bemerkung: string | null; erfasstDurch: string | null;
+  bankReferenz: string | null;   // camt.054-Import; null bei manueller Erfassung
 };
 
 export type OffenerPosten = {

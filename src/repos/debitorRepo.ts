@@ -9,7 +9,7 @@ export function offenerBetrag(brutto: number, bezahlt: number): number {
 
 const mapZ = (r: any): Zahlungseingang => ({
   id: r.id, rechnungId: r.rechnung_id, datum: r.datum, betrag: Number(r.betrag),
-  bemerkung: r.bemerkung, erfasstDurch: r.erfasst_durch,
+  bemerkung: r.bemerkung, erfasstDurch: r.erfasst_durch, bankReferenz: r.bank_referenz ?? null,
 });
 
 export async function summeBezahlt(pool: pg.Pool, rechnungId: string): Promise<number> {
@@ -17,7 +17,7 @@ export async function summeBezahlt(pool: pg.Pool, rechnungId: string): Promise<n
   return Number(r.rows[0].s);
 }
 
-export async function erfasseZahlung(pool: pg.Pool, rechnungId: string, input: { datum: string; betrag: number; bemerkung?: string | null; erfasstDurch?: string | null }): Promise<{ zahlung: Zahlungseingang; rechnungStatus: string; offen: number }> {
+export async function erfasseZahlung(pool: pg.Pool, rechnungId: string, input: { datum: string; betrag: number; bemerkung?: string | null; erfasstDurch?: string | null; bankReferenz?: string | null }): Promise<{ zahlung: Zahlungseingang; rechnungStatus: string; offen: number }> {
   if (input.betrag <= 0) throw new ValidationError('Betrag muss > 0 sein');
   const client = await pool.connect();
   try {
@@ -29,8 +29,8 @@ export async function erfasseZahlung(pool: pg.Pool, rechnungId: string, input: {
       throw new ValidationError(`Zahlung nur auf festgeschriebene Rechnung (Status ${rech.status})`);
     }
     const ins = await client.query(
-      `insert into zahlungseingang(rechnung_id,datum,betrag,bemerkung,erfasst_durch) values ($1,$2,$3,$4,$5) returning *`,
-      [rechnungId, input.datum, input.betrag, input.bemerkung ?? null, input.erfasstDurch ?? null]);
+      `insert into zahlungseingang(rechnung_id,datum,betrag,bemerkung,erfasst_durch,bank_referenz) values ($1,$2,$3,$4,$5,$6) returning *`,
+      [rechnungId, input.datum, input.betrag, input.bemerkung ?? null, input.erfasstDurch ?? null, input.bankReferenz ?? null]);
     const sumR = await client.query('select coalesce(sum(betrag),0)::numeric as s from zahlungseingang where rechnung_id=$1', [rechnungId]);
     const bezahlt = Number(sumR.rows[0].s);
     const brutto = Number(rech.total_brutto);
