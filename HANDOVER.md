@@ -63,7 +63,7 @@ Wichtige Umgebungsvariablen: `.env.example`.
 | Finanzen | `rechnungRepo` (Festschreibung, Storno mit Freigabe), `debitorRepo`, `mahnungRepo`, QR/PDF | ✅ |
 | Integration | `routes/public.ts`, `publicSchutz.ts`, `integrations/{formulare,webhooks,mail,mailVorlagen,worker}.ts`, `integrations/moodle/*`, `routes/integration.ts`, `widget/bbz-kurse.js` | ✅ |
 | Auth | `authHook.ts` (dev/entra) | ✅ |
-| Migration | `tools/fm-analyse` (DDR), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie) | ✅ / siehe unten |
+| Migration | `tools/fm-analyse` (DDR), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie aus Reporting_KUBA.xlsx, `docs/analyse/KUBA-IMPORT.md`) | ✅ |
 | Frontend | `web/` (PWA unter `/app/`) | siehe unten |
 
 ## Sicherheit (Review 28.10.2026, alle Befunde behoben, Tests: `test/sicherheit.test.ts`)
@@ -79,12 +79,16 @@ Wichtige Umgebungsvariablen: `.env.example`.
 3. **Moodle (cometas)**: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`).
 4. **Zapier**: Die Zaps von SharePoint auf `/public/v1/formulare/<formular>` umstellen und die Feldnamen gegen das Mapping prüfen (`src/integrations/formulare.ts`, `ALIASE`).
 5. **Entra ID**: App-Registrierung für API (Audience) und PWA (SPA) anlegen und die App-Rolle `bbz.admin` vergeben. In `web/config.js` `authMode: 'entra'` setzen.
-6. Mit Fachseite verifizieren:
+6. **KUBA-Import** mit der echten `Reporting_KUBA.xlsx` als Probelauf ausführen (`npm run kuba:import -- --datei …`). Status je Profil mit dem bbz-saq-Cockpit abgleichen. Offene Fragen:
+   - Schreibweise der Expertennamen
+   - Wie Passerelle und Wiederholung in KUBA markiert sind
+   - Ob nicht zugeordnete Banken angelegt oder nur als Alias geführt werden
+7. Mit Fachseite verifizieren:
    - SAQ-Bestehensgrenze: Die Website sagt „> 70 %“, KUBA „ab 70 %“; umgesetzt ist ≥ 70 %.
    - Mahnfristen der Stufen 2/3 [Hypothese].
    - QRR-Präfix gegen den SZKB-ISR-Vertrag.
    - Annullationsstaffeln für SAQ und Projekte (aktuell nur „öffentlich“ produktiv).
-7. v2.1:
+8. v2.1:
    - camt.054-Import
    - Rückerstattung von Zahlungen auf stornierte Rechnungen (heute nur im Audit-Log)
    - Preisregeln für Bankengruppen und Staffelpreise

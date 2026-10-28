@@ -34,4 +34,4 @@ npm run fm:import -- --ordner "C:\Export\FileMaker" --mapping mapping.json --zae
 2. Stichproben: 5 Projekte, 5 offene Rechnungen inklusive QR-PDF (`/rechnung/:id/pdf`).
 3. Nach der Abnahme: FileMaker auf „nur lesen“ stellen, ab dann im ERP arbeiten.
 
-Ergänzend für SAQ: Die Excel-Datei *Reporting_KUBA.xlsx* lässt sich über dasselbe Feldschema übernehmen (`GET /saq/export/kuba` zeigt das Zielformat). Das Import-Werkzeug dafür ist ein offener Folgeschritt.
+Ergänzend für SAQ: Die SAQ-Historie aus *Reporting_KUBA.xlsx* übernimmt `npm run kuba:import -- --datei <Datei>` (Probelauf als Standard). Details stehen in `docs/analyse/KUBA-IMPORT.md`.
