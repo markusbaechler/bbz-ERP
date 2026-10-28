@@ -34,7 +34,7 @@ TypeScript · Fastify 4 · PostgreSQL 16 (`pg`) · vitest · Vanilla-JS-PWA (`we
 ```bash
 docker compose up -d          # Postgres auf localhost:5433 (bbz/bbz)
 npm install
-npm test                      # 69 Suiten / 502 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
+npm test                      # 74 Suiten / 530 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
 npx tsc --noEmit
 npm run migrate && npm run seed:demo
 npm run dev                   # http://localhost:3000/app/
@@ -63,10 +63,10 @@ Wichtige Umgebungsvariablen: `.env.example`.
 | Projektmanagement | `projektRepo`, `phaseRepo`, `meilensteinRepo`, `aufgabeRepo`, `zeiterfassungRepo`, `pmAuswertungRepo`, `domain/cockpit.ts`, `routes/pm.ts` | ✅ |
 | Bildung | `kursangebotRepo`, `durchfuehrungRepo`, `anmeldungRepo` (`meldeAn` mit Zeilensperre), `lernnachweisRepo`, `bildungVerrechnungRepo`, `routes/bildung.ts` | ✅ |
 | SAQ | `saqRepo` (KUBA-Modell), `domain/saq.ts`, `routes/saq.ts`, KUBA-Export | ✅ |
-| Finanzen | `rechnungRepo` (Festschreibung, Storno mit Freigabe), `debitorRepo`, `mahnungRepo`, QR/PDF | ✅ |
+| Finanzen | `rechnungRepo` (Festschreibung, Storno mit Freigabe), `debitorRepo`, `mahnungRepo`, QR/PDF, camt.054-Import (`zahlungImportRepo`, `POST /debitoren/camt054`), Kontenauswertung (`finanzAuswertungRepo`, `GET /finanzen/konten-auswertung`) | ✅ |
 | Integration | `routes/public.ts`, `publicSchutz.ts`, `integrations/{formulare,webhooks,mail,mailVorlagen,worker}.ts`, `integrations/moodle/*`, `routes/integration.ts`, `widget/bbz-kurse.js` | ✅ |
 | Auth | `authHook.ts` (dev/entra) | ✅ |
-| Migration | `tools/fm-analyse` (DDR, SaveAsXML, Data API), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie aus Reporting_KUBA.xlsx, `docs/analyse/KUBA-IMPORT.md`) | ✅ |
+| Migration | `tools/fm-analyse` (DDR, SaveAsXML, Data API, Script-Ausdruck), `tools/fm-import` (Daten; Mapping der bbz-Loesung `mapping.bbz.json`), `tools/kuba-import` (SAQ-Historie aus Reporting_KUBA.xlsx, `docs/analyse/KUBA-IMPORT.md`) | ✅ |
 | Frontend | `web/` (Vanilla-JS-PWA unter `/app/`, ohne Build): Cockpit, CRM (Pipeline, 360°), Projekte (Gantt, Kanban), Zeit, Bildung, SAQ (inkl. KUBA-Export), Finanzen, Ressourcen-Heatmap, Admin; Stammdaten via `routes/stammdaten.ts` (`/me`, `/konto`, `/mwst-satz`) | ✅ (E2E `test/e2e/smoke.mjs`) |
 
 ## Sicherheit (Review 28.10.2026, alle Befunde behoben, Tests: `test/sicherheit.test.ts`)
@@ -77,7 +77,18 @@ Wichtige Umgebungsvariablen: `.env.example`.
 - Storno erzeugt einen **Storno-Beleg (Gutschrift)** mit eigener lückenloser Nummer und gespiegelten Beträgen.
 
 ## Offene Punkte / nächste Schritte
-1. **FileMaker direkt analysieren**: DDR liefern (Werkzeuge → Datenbank-Designreport → XML, dann `npm run fm:analyse -- <Ordner>`) **oder** ohne Oberfläche über die Data API des Servers (`fm-analyse.ps1 -Server … -Datenbank Projekte -Benutzer …`, Konto mit `fmrest`). Danach die Lücken aus Kapitel 9 schliessen. Stand: `docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md` §3. Gewählter Weg: lokale Session mit Computer Use (`docs/filemaker-analyse/LOKALE-SESSION.md`).
+1. **FileMaker-Analyse** (28.10.2026, lokale Session mit Computer Use): Kein Konto mit [Vollzugriff], daher kein DDR. Analysiert wurde stattdessen der Script-Ausdruck aller 33 Dateien (Weg D, `ANLEITUNG.md`). Ergebnis und Lückenliste mit Entscheid: `docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md`.
+   - Geschlossen: camt.054-Import, Kontenauswertung, Anmeldeliste je Institut, Postadresse in der Teilnehmerliste.
+   - Offen für die Fachseite (Lücken 6–13):
+     - IGK als zweiter Mandant
+     - Halbjahres-/Sammelrechnung je Bank
+     - Preisstufen IGK/fremd
+     - Spesen
+     - weitere Briefe
+     - Seminarbeurteilung
+     - Rechnung per Mail mit PDF
+     - Lieferschein
+   - Mit Vollzugriff den DDR nachziehen (Weg A).
 2. **Echte Exporte migrieren** gemäss `docs/filemaker-analyse/MIGRATION.md`: Probelauf, Summenabgleich, `--zaehler-start` = nächste FM-RgNr.
 3. **Moodle (cometas)**: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`).
 4. **Zapier**: Die Zaps von SharePoint auf `/public/v1/formulare/<formular>` umstellen und die Feldnamen gegen das Mapping prüfen (`src/integrations/formulare.ts`, `ALIASE`).
@@ -92,7 +103,6 @@ Wichtige Umgebungsvariablen: `.env.example`.
    - QRR-Präfix gegen den SZKB-ISR-Vertrag.
    - Annullationsstaffeln für SAQ und Projekte (aktuell nur „öffentlich“ produktiv).
 8. v2.1:
-   - camt.054-Import
    - Rückerstattung von Zahlungen auf stornierte Rechnungen (heute nur im Audit-Log)
    - Preisregeln für Bankengruppen und Staffelpreise
    - `rechnung.durchfuehrung_id`

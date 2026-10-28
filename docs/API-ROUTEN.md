@@ -1,6 +1,6 @@
 # API-Routen (generiert)
 
-Stand: 2026-10-28 · 164 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
+Stand: 2026-10-28 · 166 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
 
 ## Administration & Integration
 
@@ -32,6 +32,7 @@ Stand: 2026-10-28 · 164 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 |---|---|
 | `GET` | `/` |
 | `GET` | `/app` |
+| `GET` | `/finanzen/konten-auswertung` |
 | `GET` | `/health` |
 | `GET` | `/konto` |
 | `POST` | `/konto` |
@@ -111,6 +112,7 @@ Stand: 2026-10-28 · 164 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `GET` | `/auftraggeber` |
 | `POST` | `/auftraggeber` |
 | `GET` | `/auftraggeber/:id/saldo` |
+| `POST` | `/debitoren/camt054` |
 | `POST` | `/debitoren/mahnlauf` |
 | `GET` | `/debitoren/mahnvorschlag` |
 | `GET` | `/debitoren/offene-posten` |

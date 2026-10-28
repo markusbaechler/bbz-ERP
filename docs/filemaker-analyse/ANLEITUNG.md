@@ -38,6 +38,21 @@ Grenzen gegenüber Weg A:
 
 Datensatzinhalte und die Werte feldbasierter Wertelisten werden **nicht** übernommen. Für die Datensatzanzahl liest das Werkzeug je Tabellenvorkommen einen Datensatz und verwirft ihn sofort; mit `--ohne-anzahl` entfällt auch das. Weg C liefert schnell den Umfang. Für die Lückenanalyse der Scripts bleibt Weg A massgebend.
 
+## Weg D – Script-Ausdruck (ohne Vollzugriff)
+
+Wenn weder ein Konto mit [Vollzugriff] (Weg A) noch die Data API (Weg C) verfügbar ist, aber das Konto Scripts ansehen darf (*Datei → Verwalten → Scripts…* ist aktiv). So wurde die Analyse am 28.10.2026 durchgeführt.
+
+1. Je Datei: Fenster einblenden (*Fenster → Fenster einblenden*), *Datei → Verwalten → Scripts…*. In der Scriptliste ein Script anklicken, **nicht** auf das Kästchen («Im Menü einschliessen») und nicht auf ein bereits markiertes Script (sonst beginnt das Umbenennen). Dann Strg+A.
+2. Im Scriptarbeitsbereich *Datei → Script drucken…* → „Microsoft Print to PDF“ → `%USERPROFILE%\Documents\bbz-DDR\script-druck\<Datei>.pdf`. Die Meldung „Ihre Zugriffsrechte ermöglichen Ihnen diese Aktion nicht“ betrifft nur gesperrte Scripts; danach mit OK weiterdrucken.
+3. Text erzeugen (Git für Windows bringt `pdftotext` mit):
+   ```bash
+   cd "$USERPROFILE/Documents/bbz-DDR/script-druck" && for f in *.pdf; do pdftotext -enc UTF-8 -layout "$f" "${f%.pdf}.txt"; done
+   ```
+4. Optional `dateien.json` mit Angaben, die der Ausdruck nicht enthält: `{ "<Datei>": { "datensaetze": 5020, "gesperrteScripts": 2, "scripts": ["Namen ohne Ausdruck"] } }`.
+5. `npm run fm:analyse -- --script-druck "$USERPROFILE/Documents/bbz-DDR/script-druck" --out fm-analyse-out`
+
+Der Parser (`tools/fm-analyse/scriptDruck.ts`) übernimmt Kommentare und Kontonamen nicht. Grenzen: keine Formeln, Beziehungen, Wertelisten und Konten; Felder nur, soweit Scripts sie nennen.
+
 ## Auswertung starten
 
 ### Lokal (Windows, im Repo-Ordner)

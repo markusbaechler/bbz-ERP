@@ -17,7 +17,7 @@ Je Tabelle *Datei → Datensätze exportieren…*:
 | `Fakturen.mer` | Rechnungen (mindestens offene, idealerweise alle) | RgNr, Projektnummer, Datum, Total brutto; Bezahlt/Bezahlt am |
 
 ## 2. Mapping
-`tools/fm-import/mapping.beispiel.json` kopieren und die **Spaltennamen** an den echten Export anpassen. Den Vorschlag liefert `npm run fm:analyse` aus dem DDR: Die Datei `mapping-entwurf.json` enthält FM-Feld → ERP-Spalte. Wertelisten wie der Projektstatus werden über `werte` übersetzt.
+Für die bbz-Lösung liegt `tools/fm-import/mapping.bbz.json` bereit. Es enthält Dateien und Feldnamen aus dem Script-Ausdruck vom 28.10.2026: Projekte, Faktura_P, Adressen und Teilnehmer. Offene Punkte stehen unter `_offen`, vor allem das Feld für das Rechnungstotal. `fm-import` meldet vor dem Lauf unbekannte Felder und fehlende Pflichtfelder (`Mapping: …`). Für andere Exporte `tools/fm-import/mapping.beispiel.json` kopieren und die **Spaltennamen** an den echten Export anpassen. Den Vorschlag liefert `npm run fm:analyse` aus dem DDR: Die Datei `mapping-entwurf.json` enthält FM-Feld → ERP-Spalte. Wertelisten wie der Projektstatus werden über `werte` übersetzt.
 
 ## 3. Ablauf
 ```bash

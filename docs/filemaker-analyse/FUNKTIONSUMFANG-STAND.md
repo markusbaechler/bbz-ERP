@@ -1,28 +1,56 @@
 # FileMaker-Funktionsumfang und Abdeckung im bbz-ERP (Stand 28.10.2026)
 
 > **Kennzeichnung:** [belegt: Quelle] · [Hypothese] · [offen]
-> **Analyseweg:** Der vollständige, maschinell erhobene Funktionsumfang entsteht mit `npm run fm:analyse` aus dem Datenbank-Designreport (DDR) von FileMaker Pro Advanced (Anleitung: `ANLEITUNG.md`). Diese Seite fasst den **bisher belegten** Stand aus Discovery (Spec v1), crm-spa, bbz-saq und Website zusammen. Sobald der DDR vorliegt, ersetzt der generierte `FUNKTIONSUMFANG.md` die Tabelle unten. Was er als Lücke meldet, wird nachgezogen.
+> **Quelle:** Script-Ausdruck vom 28.10.2026 (Weg D, `ANLEITUNG.md`), ausgewertet mit `npm run fm:analyse -- --script-druck`. Der Datenbank-Designreport (DDR) war nicht möglich: Das verfügbare Konto hat keinen [Vollzugriff] [belegt: FileMaker sperrt *Datei → Dateioptionen → Öffnen* mit „Ihre Zugriffsrechte ermöglichen Ihnen diese Aktion nicht“]. Der Script-Ausdruck enthält Scripts mit allen Schritten, soweit das Konto sie ansehen darf. Daraus abgeleitet: Layouts, Dateiverweise und die in Scripts genannten Felder. Formeln, Beziehungen, Wertelisten und Konten fehlen. Datensatzzahlen: Statusbereich der Fenster [belegt: Bildschirm].
+> **Datenschutz:** Ausdrucke und Bericht liegen nur lokal (`%USERPROFILE%\Documents\bbz-DDR`, `fm-analyse-out/`). Hier stehen nur Strukturangaben.
 
-## 1. Bekannter Funktionsumfang der FileMaker-Lösung
+## 1. Funktionsumfang der FileMaker-Lösung [belegt: Script-Ausdruck]
 
-| # | FileMaker-Bereich | Belegt durch | Ablösung im ERP | Status |
+Die Lösung („IGK-Kurs-Informations-System“ / MacOffice, Entwickler INCON) besteht aus **33 Dateien** mit je einer Tabelle [Hypothese: aus FileMaker 6 konvertiert, eine Tabelle je Datei]. Erfasst sind 408 Scripts mit 2'679 Schritten; mindestens 54 weitere Scripts darf das Konto nicht ansehen, vor allem die Kontoverwaltung. Die Datei „Start“ hat keine Script-Ansicht. Die Dateien enthalten 381'839 Datensätze.
+
+| # | Bereich (Dateien, Datensätze) | Funktionen laut Scripts | Ablösung im ERP | Status |
 |---|---|---|---|---|
-| 1 | Projekte: Stammnummer.Jahr, Jahresfortführung, Bereich, Budget CHF/Tage, Kontierung | [belegt: Spec v1 §4.2, Export 151 Projekte 2026] | `projekt` + PM-Modul (Status, Phasen, Meilensteine, Aufgaben-Kanban, Gantt, Zeiterfassung, Cockpit/Ampel, Portfolio, Fortsetzen) | ✅ |
-| 2 | Auftraggeber (Banken), Debitorennummer, Adresse | [belegt: Spec v1 §4.1] | `auftraggeber` ↔ CRM-`organisation` (360°-Sicht, Bankengruppen) | ✅ |
-| 3 | Faktura mit Positionen, MWSt je Posten, lückenlose Nummer | [belegt: Spec v1 §4.3–4.4, Beleg 6231.26] | `rechnung`/`rechnungsposition`, Festschreibung, Storno mit Freigabe der Leistungen | ✅ |
-| 4 | QR-Rechnung (QRR, SZKB-QR-IBAN) als PDF | [belegt: Spec v1 §5.4, Golden-Test] | `GET /rechnung/:id/pdf` | ✅ |
-| 5 | Debitoren, Zahlungen, offene Posten | [belegt: Spec v1 §5.5] | Zahlungseingang, OP-Liste, Saldo, **Mahnwesen** (AGB-Stufen) | ✅ |
-| 6 | Seminare / Kursdurchführungen | [belegt: Spec v1 §2 „Seminare-Tabelle“] | Kursangebot, Durchführung, Kurstage, Belegung, Status, Absage-Kaskade | ✅ |
-| 7 | Teilnehmende / Anmeldungen, **Excel-Intake** | [belegt: Spec v1 §2] | Anmeldung (Warteliste, Storno nach AGB, Ersatzperson), Homepage-API, WPForms/Zapier-Eingang, Moodle-Buchungsimport | ✅ |
-| 8 | Serienbriefe | [belegt: Spec v1 §2] | Mail-Vorlagen über Outbox (Bestätigung, Warteliste, Nachrücken, Mahnung), CSV-Exporte (Teilnehmerliste, Newsletter) | ✅ Basis; Briefvorlagen-Editor [offen] |
-| 9 | Mitarbeitende / Zugriffsverwaltung (Kürzel in Rg-Nr.) | [belegt: Spec v1 §4.8] | `mitarbeitende` + Entra ID (Rollen Admin/Standard) | ✅ |
-| 10 | Referenten | [belegt: Spec v1 §4.9] | `referent` (intern/extern), Einsatzplanung mit Überbuchungsschutz, Auslastung, Honorare im Cockpit | ✅ |
-| 11 | Kontenplan, MWSt-Sätze (historisiert) | [belegt: Spec v1 §4.5–4.6] | `konto`, `mwst_satz` | ✅ |
-| 12 | Layouts/Navigation, Suchen, Druck | [Hypothese: übliche FM-Funktionen] | PWA mit Filtern, PDF/CSV | ✅ (Frontend) |
-| 13 | Scripts (Import, Export, PDF, E-Mail, Druck, URL …) | [offen: erst der DDR zeigt sie vollständig] | `fm-analyse` klassifiziert jedes Script und meldet Lücken | ⏳ DDR |
-| 14 | Berechnungsfelder, Wertelisten, eigene Funktionen | [offen: DDR] | Fachlogik in `src/domain/*` (MWSt, QR, Ampel, Annullation, Rezertifizierung …) | ⏳ DDR |
+| 1 | **Projekte** (Projekte 5'020; Schritte 24'124; Wochenplan; Referenten_P 24) | Projekt_Nr./Jahr/Kürzel, Ertrags- und Aufwandkonto, Budget; Projektschritte mit Datum, Referent, Ort, „abgerechnet“; *Termine Fortsetzung* (Jahresfortführung, 77 Schritte); Wochenplan je Referent; *Projekt-Abrechnung (mehrere)*, *nicht abgerechnete Projekte*; *Deckungsbeiträge*, *ER-Konti*, *ER nach Kunde*, *Aufw.-Konti*; Seminardaten/-kosten ins Projekt | `projekt` + PM (Phasen, Aufgaben, Zeit, Cockpit/Deckungsbeitrag je Projekt, Fortsetzen); Projektschritte → `einsatz` (Referent, Datum, Honorar, Status); **neu: Kontenauswertung** `GET /finanzen/konten-auswertung` | ✅ (Lücken 2, 9, 14) |
+| 2 | **Faktura** (Faktura_P 11'658; pos_fak1_P 166'296; pos_fak_konti 68'235; alt: Faktura 671, pos_fak1 299) | Rechnung bbz und IGK, MWSt inkl./exkl./variabel; Kontierung bis 6 Konten (*Konti berechnen*); *Beleg drucken*, *Buchen*; Honorar/Spesen in Positionen; *print Leistungen* | `rechnung`/`rechnungsposition` mit Konto, MWSt-Modus, Festschreibung, Storno mit Gutschrift, QR-PDF | ✅ bbz; IGK-Briefkopf, Leistungsblatt, Spesen offen (Lücken 4, 7, 12) |
+| 3 | **Debitoren / VESR** (7'882) | QR-Referenz und Prüfziffer, BESR-/QR-Zahlteil, *Rechnung Mail* (PDF + Leistungsblatt), Bankfile-Import *VESR_imp* mit Verbuchung über die Rechnungsnummer, *Übertrag Debitoren*, *print Lieferschein*, Mandant bbz/igk | QR-Rechnung, OP-Liste, Saldo, Mahnwesen; **neu: camt.054-Import** `POST /debitoren/camt054` | ✅ Import; Mail mit PDF und Lieferschein offen (Lücken 1, 7, 13) |
+| 4 | **Kurse/Seminare** (Kurs_Typ 631; Seminare 5'033; P_Seminare 1'367) | Kursstamm (Kategorie, Kursart, Abkürzung, Blöcke); Seminare mit Kostenkomponenten je Teilnehmer (Schulungskosten IGK/fremd, Hotel, ZF, Kurtaxe, Raum, Bücher, Reisespesen), *BAG verteilen* (Prozentzuschlag, aufgerundet); *Export AGKB DBF/TXT*; *Kursstatistik*, *Ausbildungsbedarf* | `kursangebot`, `durchfuehrung`, Nebenkosten pro Tag mit MWSt, Belegung, Absage-Kaskade, öffentliche Kurs-API | ✅ Basis; Preisstufen und Statistik offen (Lücken 8, 15, 16) |
+| 5 | **Anmeldungen** (Seminar_Belegung 53'436, 52 Layouts, 76 Scripts; P_Teilnehmer 9'443) | Status definitiv/Warteliste/abgemeldet, Spezialpreis, Vorauszahlung, *Preise aktualisieren*; *Doublettenkontrolle*; Briefe: Bestätigung, Einladung, Begleitbrief, Transferbrief, Vorgesetzteninfo, Teilnahmebestätigung, Warteliste (je bbz- und IGK-Variante); Teilnehmerlisten (auch je Bank), Namensschilder, Ordner-/Adressetiketten; *Rechnung Halbjahresrechnung* (Vorauszahlungsrechnung je Bank, 45 und 72 Schritte); Seminar-Abrechnung (Kontrolle); *Seminarbeurteilung*, *Referenten Feedback* | `anmeldung` (Warteliste, Nachrücken, Storno nach AGB, Ersatzperson), Doppelanmeldung per Unique-Index ausgeschlossen, Mailvorlagen Bestätigung/Warteliste/Nachrücken, Verrechnung je Durchführung; **neu: Liste je Institut** `GET /anmeldung?organisationId=`, **Postadresse in der Teilnehmerliste** (CSV für Etiketten/Namensschilder) | ✅ Basis; Halbjahresrechnung, weitere Briefe, Beurteilung offen (Lücken 3, 5, 6, 8, 10, 11) |
+| 6 | **Adressen/CRM** (Adressen 937; Personen 2'041; Kommunik 1'722; Teilnehmer 16'280; Banken 431; Filialen 1'588; Adr_Typ 13; Story 0; PLZ 4'353) | Firmen, Personen, Kommunikationsdaten je Person, Banken mit Rechnungsanschrift und Filialen, Adresstypen (Kunde/Interessent A–C, Lieferant, Hotel …), Next-Step-Liste, abgelaufene Termine, Adresslisten, Umschläge, *wählen* (Telefon) | `organisation`/`kontakt` mit Kategorie und Klassifizierung A/B/C, Wiedervorlagen, 360°-Sicht, `tel:`/`mailto:`-Links | ✅; Filialen teilweise (Lücke 17) |
+| 7 | **Korrespondenz/Textvorlagen** (Korresp 49; Briefe_P 32; Briefe 55; Vermerk 9) | Serienbrief, Kurzbrief, Fax, Mail, Korrekturlesen; Textvorlagen | `aktivitaet` (Briefe/E-Mails protokolliert), Mail-Vorlagen über Outbox, CSV-Exporte | ✅ Basis; Briefvorlagen-Editor offen (Lücke 10) |
+| 8 | **Stammdaten** (Konti 123; MWSt 4: 0 / 2.6 / 3.8 / 8.1 %; Standard) | Kontenplan, MWSt-Codes, Lizenznehmer, Bankverbindung, Grussformel | `konto`, `mwst_satz` (historisiert), Creditor-Konfiguration | ✅ |
+| 9 | **Zugriff** | *Konti erstellen / Konto erstellen / Konto löschen* in jeder Datei; Berechtigungssätze „Nur Dateneingabe“, „Nur Lesezugriff“ | Entra ID (Rollen Admin/Standard) | ✅ |
+| 10 | **Start/Navigation** | Startseite mit Modulnavigation, Schalter *WP-Daten* [Hypothese: Übernahme von Homepage-Daten] | PWA-Navigation, Homepage-Anbindung `/public/v1/*` | ✅ |
 
-## 2. Über FileMaker hinaus (aus Website, crm-spa, bbz-saq, Moodle-Audit)
+## 2. Lücken und Entscheid
+
+| # | Lücke (FileMaker) | Entscheid | Umsetzung / Begründung |
+|---|---|---|---|
+| 1 | Bankfile-Import und Verbuchung (*VESR_imp*) | **geschlossen** | camt.054 (QR-Gutschriften) `POST /debitoren/camt054`: Zuordnung über die QR-Referenz (= laufende Rechnungsnummer), Teilzahlungen, idempotent über die Bankreferenz (Migration 016), nicht zuordenbare Zahlungen mit Grund. `src/domain/camt054.ts`, `src/repos/zahlungImportRepo.ts` |
+| 2 | *ER-Konti*, *ER nach Kunde*, *Aufw.-Konti*, Druck aus *pos_fak_konti* | **geschlossen** | `GET /finanzen/konten-auswertung?von&bis`: Ertrag je Konto und je Auftraggeber (Storno netto 0), Honorare je Aufwandkonto. `src/repos/finanzAuswertungRepo.ts` |
+| 3 | *Teilnehmerliste pro Bank*, *Liste nach Institut* | **geschlossen** | `GET /anmeldung?organisationId=` mit Kurs-Code, Titel und Startdatum |
+| 4 | Namensschilder, Ordneretiketten, *Etiketten 3er*, Umschlag | **geschlossen** (Datenquelle) | Die Teilnehmerliste (JSON/CSV) enthält die Postadresse der Organisation. Gedruckt wird per Serienbrief/Avery-Vorlage, wie heute aus FileMaker-Layouts. Ein eigener Etikettendruck im ERP entfällt. |
+| 5 | *Doublettenkontrolle* (Anmeldungen) | **vorhanden** | Unique-Index `anmeldung_aktiv_uq`: eine aktive Anmeldung je Person und Durchführung. Kontakt-Dubletten: E-Mail-Index. Zusammenführen bestehender Dubletten [offen] |
+| 6 | *Rechnung Halbjahresrechnung* (Sammel-/Vorauszahlungsrechnung je Bank über alle Anmeldungen einer Periode) | **offen** – Fachseite | Hängt an Lücke 7 (IGK) und 8 (Preisstufen). Heute rechnet das ERP je Durchführung ab |
+| 7 | Mandant **IGK** (Faktura igk/bbz, Mandant im Debitor) | **offen** – Fachseite | Klären: Läuft IGK weiter? Wenn ja, eigene Kreditorendaten und QR-IBAN [Hypothese]. Heute ein Kreditor (`src/config/creditor.ts`) |
+| 8 | Preisstufen **IGK/fremd**, BAG-Zuschlag, Vorauszahlung, *Preise aktualisieren* | **offen** | Entspricht den „Preisregeln für Bankengruppen“ (v2.1). `organisation.gruppe_id` ist vorbereitet |
+| 9 | Spesen/Honorar in Rechnungspositionen (*Spesen Importieren*, *Import Spesen*) | **offen** | Honorare je Einsatz vorhanden, Spesen fehlen |
+| 10 | Briefe Einladung, Vorgesetzteninfo, Transferbrief, Teilnahmebestätigung/Diplom, Serien-/Kurzbrief mit Textvorlagen | **offen** | Briefvorlagen-Editor (v2.1). Heute Mail-Vorlagen Bestätigung, Warteliste, Nachrücken, Mahnung |
+| 11 | *Seminarbeurteilung*, *Kursbeurteilung*, *Referenten Feedback* | **offen** – Fachseite | [Hypothese] Feedback-Aktivität in Moodle; im ERP fehlt es |
+| 12 | *Rechnung Mail* (PDF + Leistungsblatt per E-Mail) | **offen** | Die Mail-Outbox kennt keine Anhänge. Das PDF lässt sich herunterladen (`GET /rechnung/:id/pdf`) |
+| 13 | *print Lieferschein*, Artikelpositionen (Art. Nr.), *Etiketten Führungshandbuch* | **offen** – Fachseite | [Hypothese] Verkauf von Unterlagen. Klären, ob das noch vorkommt |
+| 14 | Wochenplan als Druck | **entfällt** | Einsatzliste je Zeitraum und Auslastungs-Heatmap; Druck über den Browser |
+| 15 | *Export für AGKB* (DBF/TXT von Kurstypen, Seminaren, Referenten) | **entfällt** | Das DBF-Format ist veraltet. Kurse, Durchführungen und Referenten stehen als REST-API und Webhooks bereit |
+| 16 | *Kursstatistik*, *Ausbildungsbedarf* | **teilweise** | Belegung je Durchführung und SAQ-Kennzahlen vorhanden; Kursstatistik über Jahre [offen] |
+| 17 | Filialen je Bank | **teilweise** | `organisation.gruppe_id` im Schema, noch ohne Oberfläche |
+| 18 | PLZ-Verzeichnis | **entfällt** | PLZ/Ort werden direkt erfasst; eine Nachschlagetabelle ist für die Ablösung nicht nötig |
+| 19 | Fax | **entfällt** | nicht mehr im Einsatz [Hypothese] |
+| 20 | Verarbeitung Spende/Abo im Bankfile-Import | **entfällt** | Die Bedingungen sind in FileMaker auskommentiert [belegt: Script *Verarbeiten Spende und Abo*] |
+| 21 | Plugin-Registrierung für den QR-Code | **entfällt** | QR-Zahlteil mit `swissqrbill` |
+| 22 | Verweise auf „P_Start“, „MacOffice“, „Lizenz“ | **entfällt** | „P_Start“ existiert auf dem Server nicht [belegt: Meldung „P_Start.fmp12 konnte nicht geöffnet werden“]; „MacOffice“ ist Importquelle von Altdaten [Hypothese] |
+
+Feldzuordnung für die Datenmigration: `tools/fm-import/mapping.bbz.json` (Feldnamen aus dem Script-Ausdruck, offene Punkte unter `_offen`; `fm-import` prüft das Mapping vor dem Lauf).
+
+## 3. Über FileMaker hinaus (aus Website, crm-spa, bbz-saq, Moodle-Audit)
 
 | Bereich | Quelle | Im ERP |
 |---|---|---|
@@ -33,15 +61,16 @@
 | Formulare WPForms → Zapier → SharePoint | [belegt: Datenschutzerklärung] | Formular-Eingang `/public/v1/formulare/*` |
 | Doppelte Terminpflege (Elementor-Listen, Formular-Dropdowns, Moodle) | [belegt: Website-Quelltext] | ERP als einziges Terminstammdatum, Widget/API |
 
-## 3. Stand der direkten Analyse (28.10.2026)
+## 4. Stand der direkten Analyse (28.10.2026)
 | Weg | Was er liefert | Stand |
 |---|---|---|
-| A – Designreport (XML) | alles inkl. Script-Schritte, Formeln, Beziehungen, Rechte | Werkzeug fertig und getestet; **Export fehlt** (nur am Rechner mit FileMaker möglich) |
-| C – Data API des Servers | Layouts, Scripts (Namen), Felder je Tabellenvorkommen, Wertelisten, Datensatzanzahlen | Werkzeug fertig und getestet; **Zugang fehlt** (fmrest-Konto, https-Erreichbarkeit von `BBZ-AZ-SRVAPP01`) |
-| Computer Use | Claude erstellt den DDR selbst im FileMaker-Fenster | in der Cloud-Session nicht verfügbar; nötig ist eine Session auf dem Rechner mit FileMaker |
-| Weitere Belege | Google Drive, Repos bbz-marktanalyse und bbz_Kurswerkstatt durchsucht | keine FileMaker-Artefakte gefunden; bbz360 und crm-spa waren in dieser Session nicht zugänglich |
+| A – Designreport (XML) | alles inkl. Formeln, Beziehungen, Wertelisten, Rechte | **nicht möglich**: kein Konto mit [Vollzugriff]. Werkzeug fertig und getestet |
+| C – Data API des Servers | Layouts, Scripts (Namen), Felder je Tabellenvorkommen, Wertelisten | **nicht möglich**: Der Server (FileMaker-Verbindung Port 5003) ist auf https/443 nicht erreichbar [belegt: Verbindungstest]; zusätzlich fehlt ein fmrest-Konto |
+| D – Script-Ausdruck (ohne Vollzugriff) | Scripts mit Schritten wie im DDR; daraus Layouts, Dateiverweise, referenzierte Felder | **durchgeführt** per Computer Use: 33 Dateien, 408 Scripts, 2'679 Schritte. Ergebnis in Kapitel 1 und 2 |
 
-Die Tabelle in Kapitel 1 bleibt deshalb **indirekt belegt**. Discovery-Bericht (Spec v1), echter Projekte-Export und Rechnungsbelege sind Primärquellen. Die Scripts sind es nicht.
+Offen bleibt, was nur der DDR zeigt: Feldtypen, Formeln (z. B. Rechnungstotal, Vergleichszahl der Doublettenkontrolle), Beziehungen, Wertelisten und die gesperrten Scripts. Sobald ein Konto mit [Vollzugriff] verfügbar ist (Entwickler INCON oder Server-Administration [Hypothese]), ergänzt Weg A das Bild in rund 2 Minuten. Dann: `npm run fm:analyse -- "%USERPROFILE%\Documents\bbz-DDR"`.
 
-## 4. Nächster Schritt
-DDR erzeugen (2 Minuten, `ANLEITUNG.md` Weg A) **oder** Data-API-Lauf (Weg C) → `npm run fm:analyse` → Kapitel „Lücken“ des Berichts prüfen → Mapping für die Datenmigration (`MIGRATION.md`) übernehmen.
+## 5. Nächster Schritt
+1. Fachseite klärt die offenen Lücken 6–13 (zuerst IGK als Mandant, weil Halbjahresrechnung und Preisstufen daran hängen).
+2. Erster echter Export (`MIGRATION.md`) mit `mapping.bbz.json`: Kopfzeilen prüfen, `rechnungen.totalBrutto` ergänzen, Probelauf.
+3. Bei Zugang mit [Vollzugriff]: DDR nachziehen (Weg A).
