@@ -59,7 +59,7 @@ export async function setEinsatzStatus(db: Db, id: string, status: EinsatzStatus
   return map(r.rows[0]);
 }
 
-export async function listEinsaetze(db: Db, filter: { referentId?: string; projektId?: string; kurstagId?: string; von?: string; bis?: string } = {}): Promise<Einsatz[]> {
+export async function listEinsaetze(db: Db, filter: { referentId?: string; projektId?: string; kurstagId?: string; von?: string; bis?: string; status?: EinsatzStatus | EinsatzStatus[] } = {}): Promise<Einsatz[]> {
   const cond: string[] = []; const args: unknown[] = [];
   const add = (sql: string, v: unknown) => { args.push(v); cond.push(sql.replace('?', `$${args.length}`)); };
   if (filter.referentId) add('referent_id=?', filter.referentId);
@@ -67,6 +67,7 @@ export async function listEinsaetze(db: Db, filter: { referentId?: string; proje
   if (filter.kurstagId) add('kurstag_id=?', filter.kurstagId);
   if (filter.von) add('datum>=?', filter.von);
   if (filter.bis) add('datum<=?', filter.bis);
+  if (filter.status !== undefined) add('status = any(?)', Array.isArray(filter.status) ? filter.status : [filter.status]);
   const r = await db.query(`select * from einsatz ${cond.length ? 'where ' + cond.join(' and ') : ''} order by datum, referent_id`, args);
   return r.rows.map(map);
 }
