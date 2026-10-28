@@ -22,22 +22,28 @@ alter table durchfuehrung add column moodle_session_id integer unique;
 alter table lernnachweis add column komponenten text[] not null default '{}'
   check (komponenten <@ array['fachwissen','verhalten']::text[]);
 
--- Zertifizierung: SAQ-Profil
-alter table zertifizierung add column profil text check (profil in ('PK','IK','AFF','CWMA','KMU','CCOB'));
+-- SAQ "Kundenberater Bank": Begriffe und Codes wie Reporting KUBA / bbz-saq (config.js PROFILES, PROFILE_PARTS)
+-- Profile: PK, IK, AFFL, CWMA, KMU, CCoB · Sprachen DE, FR, IT, EN
+alter table zertifizierung
+  add column profil text check (profil in ('PK','IK','AFFL','CWMA','KMU','CCoB')),
+  add column sprache text check (sprache in ('DE','FR','IT','EN'));
 
--- SAQ-Zertifizierungsfall (Anmeldung -> Pruefungen -> Zertifikat)
+-- Zertifizierungsvorgang: eine Person durchlaeuft die Zertifizierung fuer ein Profil (KUBA: eine Zeile)
 create table saq_fall (
   id uuid primary key default gen_random_uuid(),
   kontakt_id uuid not null references kontakt(id),
-  organisation_id uuid references organisation(id),                -- Arbeitgeber-Bank
+  organisation_id uuid references organisation(id),                -- Arbeitgeber-Bank (KUBA "Employer")
   rechnungsempfaenger_id uuid references auftraggeber(id),
-  profil text not null check (profil in ('PK','IK','AFF','CWMA','KMU','CCOB')),
-  variante text not null default 'erstzertifizierung',              -- erstzertifizierung, tp1, tp2, tp3, passerelle, ...
+  profil text not null check (profil in ('PK','IK','AFFL','CWMA','KMU','CCoB')),
+  variante text not null default 'erstzertifizierung'
+    check (variante in ('erstzertifizierung','passerelle','teilpruefung','wiederholung')),
   umfang text not null default 'gesamtpaket'
     check (umfang in ('selbststudium','schriftlich','muendlich','gesamtpaket')),
-  sprache text not null default 'de' check (sprache in ('de','fr','it')),
+  sprache text not null default 'DE' check (sprache in ('DE','FR','IT','EN')),
+  rolle text,                                                       -- Funktion gemaess SAQ-Rollenschluessel (KUBA "Role")
+  kennzeichnung text,                                               -- VSS/VSM aus KUBA-Kommentar, Bedeutung [unklar]
   status text not null default 'angemeldet'
-    check (status in ('angemeldet','in_vorbereitung','schriftlich_bestanden','zertifiziert','nicht_bestanden','abgebrochen')),
+    check (status in ('angemeldet','in_pruefung','schriftlich_bestanden','bestanden','zertifiziert','nicht_bestanden','abgebrochen')),
   arbeitgeberbestaetigung_am date,
   digitale_hilfsmittel boolean not null default false,
   einwilligung_rechnung_bank boolean not null default false,
@@ -45,6 +51,7 @@ create table saq_fall (
   zertifizierung_id uuid references zertifizierung(id),
   rechnung_id uuid references rechnung(id),
   anfrage_id uuid references anfrage(id),
+  kuba_herkunft text,                                               -- "Sheet:Zeile" bei Import aus Reporting_KUBA.xlsx
   bemerkung text,
   erstellt_am timestamptz not null default now(),
   geaendert_am timestamptz not null default now()
@@ -52,20 +59,28 @@ create table saq_fall (
 create index saq_fall_kontakt_idx on saq_fall (kontakt_id);
 create index saq_fall_status_idx on saq_fall (status, profil);
 
+-- Ein Run einer Teilpruefung (KUBA: WE1-WE6 schriftlich, OE1-OE2 muendlich, je RUN1-RUN3)
 create table saq_pruefung (
   id uuid primary key default gen_random_uuid(),
   fall_id uuid not null references saq_fall(id) on delete cascade,
   art text not null check (art in ('schriftlich','muendlich')),
+  teil integer not null check (teil between 1 and 6),
+  run integer not null check (run between 1 and 3),
   durchfuehrung_id uuid references durchfuehrung(id),                -- Pruefungstermin (Kapazitaet)
   datum date not null,
   ort text,
   remote boolean not null default false,
-  versuch integer not null default 1,
-  resultat_prozent numeric(5,2) check (resultat_prozent between 0 and 100),
-  bestanden boolean,
-  erstellt_am timestamptz not null default now()
+  score numeric(6,2),                                               -- Punkte (KUBA "Score")
+  resultat_prozent numeric(5,2) check (resultat_prozent between 0 and 100),   -- KUBA "Result"
+  bestanden boolean,                                                -- massgebend (KUBA "Passed"); null = geplant/offen
+  experte1_id uuid references referent(id),                         -- muendlich: Experte 1 / 2 (KUBA ab 2018)
+  experte2_id uuid references referent(id),
+  erstellt_am timestamptz not null default now(),
+  unique (fall_id, art, teil, run),
+  check (art = 'schriftlich' or teil <= 2)
 );
-create index saq_pruefung_fall_idx on saq_pruefung (fall_id, art);
+create index saq_pruefung_fall_idx on saq_pruefung (fall_id, art, teil);
+create index saq_pruefung_datum_idx on saq_pruefung (datum);
 
 -- Mahnwesen (AGB: 30 Tage Zahlungsfrist, Erinnerung 10 Tage, ab 2. Erinnerung CHF 50)
 alter table rechnung add column zahlungsfrist_tage integer not null default 30 check (zahlungsfrist_tage between 0 and 365);
