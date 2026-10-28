@@ -14,7 +14,7 @@ const epoch = (datum: string, tage: number) => Math.floor((Date.parse(`${datum}T
 
 async function ladeAnmeldung(pool: pg.Pool, anmeldungId: string) {
   const r = await pool.query(
-    `select a.id, a.status, a.moodle_status, a.kontakt_id, k.email, k.vorname, k.nachname, k.sprache, k.moodle_user_id,
+    `select a.id, a.status, a.quelle, a.moodle_status, a.kontakt_id, k.email, k.vorname, k.nachname, k.sprache, k.moodle_user_id,
             d.moodle_kurs_id, d.start_datum, d.end_datum
      from anmeldung a join kontakt k on k.id = a.kontakt_id join durchfuehrung d on d.id = a.durchfuehrung_id
      where a.id = $1`, [anmeldungId]);
@@ -42,6 +42,8 @@ export async function moodleEinschreiben(pool: pg.Pool, moodle: MoodleClient | n
   const a = await ladeAnmeldung(pool, anmeldungId);
   if (!a || !['bestaetigt', 'teilgenommen', 'abgeschlossen'].includes(a.status)) return 'uebersprungen';
   if (!a.moodle_kurs_id) { await setzeStatus(pool, anmeldungId, 'nicht_relevant', null); return 'uebersprungen'; }
+  // In Moodle gebucht (Face-to-Face): Person ist dort bereits im Kurs -> nur Status nachfuehren.
+  if (a.quelle === 'moodle') { await setzeStatus(pool, anmeldungId, 'eingeschrieben', null); return 'uebersprungen'; }
   if (!moodle) throw new Error('Moodle ist nicht konfiguriert (MOODLE_URL/MOODLE_TOKEN)');
   if (!a.email) { await setzeStatus(pool, anmeldungId, 'fehler', 'Kontakt ohne E-Mail'); throw new Error('Kontakt ohne E-Mail'); }
   try {

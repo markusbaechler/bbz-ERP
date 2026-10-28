@@ -28,7 +28,9 @@ export function standardHandler(pool: pg.Pool, deps: WorkerDeps): Record<string,
       const n = await verteileEreignis(pool, e);
       const vorlage = ereignisMails[e.payload.ereignis];
       const anmeldungId = e.payload.daten?.anmeldungId;
-      if (vorlage && anmeldungId) {
+      // In Moodle gebuchte Anmeldungen erhalten die Bestaetigung von Moodle selbst (keine Doppel-Mail).
+      const ausMoodle = anmeldungId && (await pool.query(`select 1 from anmeldung where id=$1 and quelle='moodle'`, [anmeldungId])).rowCount;
+      if (vorlage && anmeldungId && !ausMoodle) {
         await pool.query(`insert into outbox(typ, aggregat_id, payload) values ('mail', $1, $2)`,
           [anmeldungId, JSON.stringify({ vorlage, an: null, daten: { anmeldungId } })]);
       }

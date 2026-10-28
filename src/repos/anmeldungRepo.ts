@@ -36,12 +36,12 @@ export type KontaktReferenz = {
 
 export type MeldeAnInput = KontaktReferenz & {
   rechnungsempfaengerId?: string | null; rechnungsreferenz?: string | null; bemerkung?: string | null;
-  quelle?: 'manuell' | 'homepage' | 'import'; idempotenzSchluessel?: string | null;
+  quelle?: 'manuell' | 'homepage' | 'import' | 'moodle'; idempotenzSchluessel?: string | null;
 };
 
 export type MeldeAnErgebnis = { anmeldung: Anmeldung; warteliste: boolean; kontaktNeu: boolean };
 
-const QUELLEN = ['manuell', 'homepage', 'import'];
+const QUELLEN = ['manuell', 'homepage', 'import', 'moodle'];
 const istClient = (db: Db): boolean => typeof (db as pg.PoolClient).release === 'function';
 
 async function ermittleKontakt(c: Db, ref: KontaktReferenz): Promise<{ kontakt: Kontakt; neu: boolean }> {

@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type pg from 'pg';
 import { registriereAuth, authKonfigAusEnv, type AuthKonfig } from './authHook';
 import { registrierePublicSchutz } from './publicSchutz';
+import { registriereStatisch } from './statisch';
 import { registerIntegrationRoutes } from './routes/integration';
 import type { WorkerDeps } from '../integrations/worker';
 import { moodleAusEnv } from '../integrations/moodle/client';
@@ -30,6 +31,7 @@ export function buildApp(pool: pg.Pool, opts: AppOptionen = {}): FastifyInstance
     moodleTiming: opts.integration?.moodleTiming, ereignisMails: opts.integration?.ereignisMails,
   });
   app.get('/health', async () => ({ ok: true }));
+  registriereStatisch(app);
   app.get('/admin/ping', { preHandler: requireAdmin }, async () => ({ ok: true }));
   registerAuftraggeberRoutes(app, pool);
   registerProjektRoutes(app, pool);
