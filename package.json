@@ -13,7 +13,8 @@
     "fm:analyse": "tsx tools/fm-analyse/cli.ts",
     "worker": "tsx src/integrations/workerMain.ts",
     "fm:import": "tsx tools/fm-import/cli.ts",
-    "api:routen": "tsx tools/api-routen.ts"
+    "api:routen": "tsx tools/api-routen.ts",
+    "moodle:abschluss": "tsx src/integrations/moodle/abschlussMain.ts"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",

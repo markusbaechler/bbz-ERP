@@ -24,7 +24,7 @@ Die Zuordnung Session ↔ Durchführung läuft über `durchfuehrung.moodle_sessi
 
 ## 3. Betrieb
 - Der Worker-Prozess `npm run worker` arbeitet die Outbox ab; Intervall über `WORKER_INTERVALL_MS`.
-- Für den Abschluss-Sync einen Cron einrichten, z. B. nachts:
+- Für den Abschluss-Sync einen Cron einrichten (Server: `npm run moodle:abschluss`, oder per HTTP), z. B. nachts:
   ```bash
   curl -X POST -H "Authorization: Bearer <Token>" https://erp…/integration/moodle/abschluss-sync
   ```
