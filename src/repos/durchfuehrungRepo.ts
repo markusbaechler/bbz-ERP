@@ -31,7 +31,7 @@ const mapD = (r: any): Durchfuehrung => ({
   projektId: r.projekt_id, code: r.code, titel: r.titel, startDatum: r.start_datum, endDatum: r.end_datum, ort: r.ort,
   kapazitaet: r.kapazitaet, minTeilnehmende: r.min_teilnehmende, anmeldeschluss: r.anmeldeschluss,
   preisChf: num(r.preis_chf), status: r.status, oeffentlich: r.oeffentlich, auftraggeberId: r.auftraggeber_id,
-  moodleKursId: r.moodle_kurs_id, leitungId: r.leitung_id,
+  moodleKursId: r.moodle_kurs_id, moodleSessionId: r.moodle_session_id ?? null, leitungId: r.leitung_id,
 });
 
 const mapKurstag = (r: any): Kurstag => ({
@@ -45,6 +45,8 @@ export type DurchfuehrungInput = {
   kursangebotId: string; startDatum: string; endDatum: string; projektId?: string | null; titel?: string | null;
   ort?: string | null; kapazitaet?: number; minTeilnehmende?: number; anmeldeschluss?: string | null;
   preisChf?: number | null; oeffentlich?: boolean; auftraggeberId?: string | null; moodleKursId?: number | null;
+  /** Moodle-Face-to-Face-Session (s=<ID>), fuer die Uebernahme der Moodle-Buchungen */
+  moodleSessionId?: number | null;
   leitungId?: string | null;
   /** Explizite Kurstage; fehlt die Liste, wird je Werktag zwischen Start und Ende ein Kurstag erzeugt ([] = keine). */
   kurstage?: KurstagInput[];
@@ -55,7 +57,7 @@ export type DurchfuehrungPatch = Partial<Omit<DurchfuehrungInput, 'kursangebotId
 const COLS: Record<string, string> = {
   projektId: 'projekt_id', titel: 'titel', startDatum: 'start_datum', endDatum: 'end_datum', ort: 'ort',
   kapazitaet: 'kapazitaet', minTeilnehmende: 'min_teilnehmende', anmeldeschluss: 'anmeldeschluss', preisChf: 'preis_chf',
-  oeffentlich: 'oeffentlich', auftraggeberId: 'auftraggeber_id', moodleKursId: 'moodle_kurs_id', leitungId: 'leitung_id',
+  oeffentlich: 'oeffentlich', auftraggeberId: 'auftraggeber_id', moodleKursId: 'moodle_kurs_id', moodleSessionId: 'moodle_session_id', leitungId: 'leitung_id',
 };
 
 function pruefeFelder(p: DurchfuehrungPatch): void {
@@ -200,6 +202,7 @@ export async function createDurchfuehrung(db: Db, input: DurchfuehrungInput): Pr
        input.preisChf ?? null, input.oeffentlich ?? null, input.auftraggeberId ?? null, input.moodleKursId ?? null,
        input.leitungId ?? null]);
     const id: string = r.rows[0].id;
+    if (input.moodleSessionId != null) await c.query('update durchfuehrung set moodle_session_id=$2 where id=$1', [id, input.moodleSessionId]);
     for (const k of kurstage) await insertKurstag(c, id, k);
     return getDurchfuehrung(c, id);
   });

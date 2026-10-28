@@ -48,6 +48,13 @@ export async function verrechneDurchfuehrung(db: Db, durchfuehrungId: string, in
     const kurs = `Kurs ${d.titel ?? d.kursangebotTitel} ${d.code}`;
     const position = (beschreibung: string, einzelpreis: number) =>
       ({ beschreibung, menge: 1, einheit: 'Pauschal', einzelpreis, mwstSatz: d.mwstSatz, kontoId: d.ertragskontoId });
+    // Nebenkosten (Verpflegung/Infrastruktur) je Teilnehmer:in und Kurstag, eigener MWSt-Satz (AGB: separat ausgewiesen)
+    const nk = (await c.query(
+      `select ka.nebenkosten_pro_tag_chf as satz, ka.nebenkosten_mwst_satz as mwst,
+              greatest((select count(*) from kurstag t where t.durchfuehrung_id=d.id), 1)::int as tage
+       from durchfuehrung d join kursangebot ka on ka.id=d.kursangebot_id where d.id=$1`, [d.id])).rows[0];
+    const nebenkosten = nk?.satz !== null && Number(nk?.satz) > 0
+      ? { proTag: Number(nk.satz), mwstSatz: Number(nk.mwst), tage: Number(nk.tage) } : null;
     const neueRechnung = (auftraggeberId: string) =>
       createRechnung(c, { projektId: projekt.id, auftraggeberId, datum, betreff: kurs, mwstModus: projekt.mwstModus });
 
@@ -92,6 +99,10 @@ export async function verrechneDurchfuehrung(db: Db, durchfuehrungId: string, in
           await addPosition(c, rechnung.id, o.status === 'storniert'
             ? position(`Annullationskosten ${kurs} – ${o.name}${ref}`, o.gebuehrChf ?? 0)
             : position(`${kurs} – ${o.name}${ref}`, o.preisChf ?? 0));
+          if (nebenkosten && o.status !== 'storniert') {
+            await addPosition(c, rechnung.id, { beschreibung: `Nebenkosten (Verpflegung/Infrastruktur) ${d.code} – ${o.name}`,
+              menge: nebenkosten.tage, einheit: 'Tag', einzelpreis: nebenkosten.proTag, mwstSatz: nebenkosten.mwstSatz, kontoId: d.ertragskontoId });
+          }
         }
         await verrechnet(rechnung.id, gruppe.map((o) => o.id));
         rechnungIds.push(rechnung.id);

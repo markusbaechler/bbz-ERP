@@ -12,6 +12,9 @@ export const mapKursangebot = (r: any): Kursangebot => ({
   dauerTage: num(r.dauer_tage), lernstunden: num(r.lernstunden), preisChf: num(r.preis_chf), mwstSatz: Number(r.mwst_satz),
   ertragskontoId: r.ertragskonto_id, saqAnerkannt: r.saq_anerkannt, moodleVorlageKursId: r.moodle_vorlage_kurs_id,
   oeffentlich: r.oeffentlich, slug: r.slug, aktiv: r.aktiv,
+  homepagePostId: r.homepage_post_id ?? null, rezertProfile: r.rezert_profile ?? [], rezertKomponenten: r.rezert_komponenten ?? [],
+  nebenkostenProTagChf: num(r.nebenkosten_pro_tag_chf), nebenkostenMwstSatz: Number(r.nebenkosten_mwst_satz ?? 8.1),
+  annullationsregel: r.annullationsregel ?? 'oeffentlich',
 });
 
 export type KursangebotInput = {
@@ -20,14 +23,21 @@ export type KursangebotInput = {
   dauerTage?: number | null; lernstunden?: number | null; preisChf?: number | null; mwstSatz?: number;
   ertragskontoId?: string | null; saqAnerkannt?: boolean; moodleVorlageKursId?: number | null;
   oeffentlich?: boolean; slug?: string | null; aktiv?: boolean;
+  homepagePostId?: number | null; rezertProfile?: string[]; rezertKomponenten?: ('fachwissen' | 'verhalten')[];
+  nebenkostenProTagChf?: number | null; nebenkostenMwstSatz?: number; annullationsregel?: Kursangebot['annullationsregel'];
 };
+
+/** Felder aus Migration 012 (Website-/AGB-Analyse); werden nach dem Insert per Update gesetzt. */
+const V2_FELDER = ['homepagePostId', 'rezertProfile', 'rezertKomponenten', 'nebenkostenProTagChf', 'nebenkostenMwstSatz', 'annullationsregel'] as const;
+const REZERT_PROFILE = ['PK', 'IK', 'AFFL', 'CWMA', 'KMU', 'CCoB'];
 
 const COLS: Record<string, string> = {
   code: 'code', titel: 'titel', untertitel: 'untertitel', bereich: 'bereich', format: 'format', beschreibung: 'beschreibung',
   lernziele: 'lernziele', zielgruppe: 'zielgruppe', voraussetzungen: 'voraussetzungen', dauerTage: 'dauer_tage',
   lernstunden: 'lernstunden', preisChf: 'preis_chf', mwstSatz: 'mwst_satz', ertragskontoId: 'ertragskonto_id',
   saqAnerkannt: 'saq_anerkannt', moodleVorlageKursId: 'moodle_vorlage_kurs_id', oeffentlich: 'oeffentlich', slug: 'slug',
-  aktiv: 'aktiv',
+  aktiv: 'aktiv', homepagePostId: 'homepage_post_id', rezertProfile: 'rezert_profile', rezertKomponenten: 'rezert_komponenten',
+  nebenkostenProTagChf: 'nebenkosten_pro_tag_chf', nebenkostenMwstSatz: 'nebenkosten_mwst_satz', annullationsregel: 'annullationsregel',
 };
 
 const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
@@ -52,8 +62,18 @@ function normalisiere(input: Partial<KursangebotInput>): Partial<KursangebotInpu
     const v = input[f];
     if (v !== undefined && v !== null && !(typeof v === 'number' && v >= 0)) throw new ValidationError(`${f} muss >= 0 sein`);
   }
-  if (input.mwstSatz !== undefined && !(typeof input.mwstSatz === 'number' && input.mwstSatz >= 0 && input.mwstSatz <= 100)) {
-    throw new ValidationError('mwstSatz muss zwischen 0 und 100 liegen');
+  for (const f of ['mwstSatz', 'nebenkostenMwstSatz'] as const) {
+    const v = input[f];
+    if (v !== undefined && !(typeof v === 'number' && v >= 0 && v <= 100)) throw new ValidationError(`${f} muss zwischen 0 und 100 liegen`);
+  }
+  if (input.nebenkostenProTagChf !== undefined && input.nebenkostenProTagChf !== null && !(input.nebenkostenProTagChf >= 0)) {
+    throw new ValidationError('nebenkostenProTagChf muss >= 0 sein');
+  }
+  const falscheProfile = (input.rezertProfile ?? []).filter((x) => !REZERT_PROFILE.includes(x));
+  if (falscheProfile.length) throw new ValidationError(`Unbekannte SAQ-Profile: ${falscheProfile.join(', ')} (erlaubt: ${REZERT_PROFILE.join(', ')})`);
+  if ((input.rezertKomponenten ?? []).some((x) => x !== 'fachwissen' && x !== 'verhalten')) throw new ValidationError('rezertKomponenten: fachwissen/verhalten');
+  if (input.annullationsregel !== undefined && !['oeffentlich', 'saq', 'projekt', 'keine'].includes(input.annullationsregel)) {
+    throw new ValidationError('annullationsregel muss oeffentlich/saq/projekt/keine sein');
   }
   return out;
 }
@@ -98,7 +118,8 @@ export async function createKursangebot(db: Db, input: KursangebotInput): Promis
      n.mwstSatz ?? null, n.ertragskontoId ?? null, n.saqAnerkannt ?? null, n.moodleVorlageKursId ?? null,
      n.oeffentlich ?? null, slug, n.aktiv ?? null],
   ).catch(alsKonflikt);
-  return mapKursangebot(r.rows[0]);
+  const v2 = Object.fromEntries(V2_FELDER.filter((f) => n[f] !== undefined).map((f) => [f, n[f]]));
+  return Object.keys(v2).length ? updateKursangebot(db, r.rows[0].id, v2) : mapKursangebot(r.rows[0]);
 }
 
 export async function getKursangebot(db: Db, id: string): Promise<Kursangebot> {

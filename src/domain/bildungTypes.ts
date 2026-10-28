@@ -10,6 +10,9 @@ export type Kursangebot = {
   dauerTage: number | null; lernstunden: number | null; preisChf: number | null; mwstSatz: number;
   ertragskontoId: string | null; saqAnerkannt: boolean; moodleVorlageKursId: number | null;
   oeffentlich: boolean; slug: string | null; aktiv: boolean;
+  /** v2 (Website/AGB): Homepage-Verknuepfung, Rezertifizierung, Nebenkosten, Annullationsregel */
+  homepagePostId: number | null; rezertProfile: string[]; rezertKomponenten: ('fachwissen' | 'verhalten')[];
+  nebenkostenProTagChf: number | null; nebenkostenMwstSatz: number; annullationsregel: 'oeffentlich' | 'saq' | 'projekt' | 'keine';
 };
 
 export type DurchfuehrungStatus = 'geplant' | 'ausgeschrieben' | 'bestaetigt' | 'durchgefuehrt' | 'abgesagt';
@@ -20,7 +23,7 @@ export type Durchfuehrung = {
   id: string; kursangebotId: string; kursangebotCode: string; kursangebotTitel: string; projektId: string | null;
   code: string | null; titel: string | null; startDatum: string; endDatum: string; ort: string | null;
   kapazitaet: number; minTeilnehmende: number; anmeldeschluss: string | null; preisChf: number | null;
-  status: DurchfuehrungStatus; oeffentlich: boolean; auftraggeberId: string | null; moodleKursId: number | null;
+  status: DurchfuehrungStatus; oeffentlich: boolean; auftraggeberId: string | null; moodleKursId: number | null; moodleSessionId: number | null;
   leitungId: string | null;
 };
 
