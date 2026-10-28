@@ -1,0 +1,6 @@
+ProjektNr;Projektname;Bereich;AuftraggeberNr;Budget;Budget Tage;Ertragskonto;Status;Beschrieb
+6231.26;Kundenberaterausbildung 2026;Kundenberaterausbildung;20577;"24'600.00";2.5;3100;aktiv;"Zeile 1Zeile 2"
+6231.25;Kundenberaterausbildung 2025;Kundenberaterausbildung;20577;20000;2;3100;erledigt;
+7001.26;Leadership Musterbank;Leadership;20578;12000,50;;9999;aktiv;
+7002.26;Projekt ohne Debitor;Beratung;20579;5000;;;aktiv;
+kaputt;X;;20577;;;;;

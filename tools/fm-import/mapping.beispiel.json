@@ -1,0 +1,12 @@
+{
+  "_hinweis": "ERP-Feld -> Spaltenname im FileMaker-Export (.mer mit Kopfzeile). Spaltennamen an den echten Export anpassen; Vorschlag liefert npm run fm:analyse (mapping-entwurf.json).",
+  "mitarbeitende": { "datei": "Mitarbeitende.mer", "felder": { "kuerzel": "Kuerzel", "vorname": "Vorname", "nachname": "Name", "email": "E-Mail", "rolle": "Rolle" } },
+  "auftraggeber": { "datei": "Auftraggeber.mer", "felder": { "nummer": "Nummer", "name": "Name", "strasse": "Strasse", "plz": "PLZ", "ort": "Ort", "land": "Land", "email": "E-Mail", "telefon": "Telefon", "ansprechperson": "Ansprechperson" } },
+  "projekte": {
+    "datei": "Projekte.mer",
+    "felder": { "nummer": "ProjektNr", "name": "Projektname", "bereich": "Bereich", "auftraggeberNummer": "AuftraggeberNr", "budgetChf": "Budget", "budgetTage": "Budget Tage", "kontoNummer": "Ertragskonto", "status": "Status", "beschrieb": "Beschrieb" },
+    "werte": { "status": { "aktiv": "laufend", "offen": "laufend", "erledigt": "abgeschlossen", "abgeschlossen": "abgeschlossen", "Offerte": "offeriert", "abgesagt": "abgesagt" } }
+  },
+  "kontakte": { "datei": "Kontakte.mer", "felder": { "anrede": "Anrede", "vorname": "Vorname", "nachname": "Nachname", "email": "E-Mail", "telefon": "Telefon", "mobile": "Mobile", "funktion": "Funktion", "organisation": "Firma", "bemerkung": "Bemerkung" } },
+  "rechnungen": { "datei": "Fakturen.mer", "felder": { "lfdNr": "RgNr", "nummer": "Rechnungsnummer", "projektNummer": "ProjektNr", "datum": "Datum", "totalNetto": "Total netto", "totalBrutto": "Total brutto", "bezahlt": "Bezahlt", "bezahltAm": "Bezahlt am", "betreff": "Betreff" } }
+}

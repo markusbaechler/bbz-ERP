@@ -11,7 +11,8 @@
     "migrate": "tsx src/db/migrate.ts",
     "dev": "tsx watch src/server/main.ts",
     "fm:analyse": "tsx tools/fm-analyse/cli.ts",
-    "worker": "tsx src/integrations/workerMain.ts"
+    "worker": "tsx src/integrations/workerMain.ts",
+    "fm:import": "tsx tools/fm-import/cli.ts"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",

@@ -1,13 +1,13 @@
-import type pg from 'pg';
 import type { Auftraggeber } from '../domain/types';
 import { ValidationError, NotFoundError } from '../domain/errors';
+import type { Db } from './db';
 
 const map = (r: any): Auftraggeber => ({
   id: r.id, nummer: r.nummer, name: r.name, strasse: r.strasse, plz: r.plz, ort: r.ort,
   land: r.land, ansprechperson: r.ansprechperson, email: r.email, telefon: r.telefon, aktiv: r.aktiv,
 });
 
-export async function createAuftraggeber(pool: pg.Pool, input: {
+export async function createAuftraggeber(pool: Db, input: {
   nummer?: string | null; name: string; strasse: string; plz: string; ort: string;
   land?: string; ansprechperson?: string | null; email?: string | null; telefon?: string | null;
 }): Promise<Auftraggeber> {
@@ -22,13 +22,13 @@ export async function createAuftraggeber(pool: pg.Pool, input: {
   return map(r.rows[0]);
 }
 
-export async function getAuftraggeberById(pool: pg.Pool, id: string): Promise<Auftraggeber> {
+export async function getAuftraggeberById(pool: Db, id: string): Promise<Auftraggeber> {
   const r = await pool.query('select * from auftraggeber where id=$1', [id]);
   if (!r.rowCount) throw new NotFoundError(`Auftraggeber ${id} nicht gefunden`);
   return map(r.rows[0]);
 }
 
-export async function listAuftraggeber(pool: pg.Pool): Promise<Auftraggeber[]> {
+export async function listAuftraggeber(pool: Db): Promise<Auftraggeber[]> {
   const r = await pool.query('select * from auftraggeber order by name');
   return r.rows.map(map);
 }
