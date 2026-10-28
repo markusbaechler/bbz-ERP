@@ -15,3 +15,14 @@ describe('CRM 360° mit SAQ-Vorgaengen', () => {
     expect(k.saqVorgaenge).toEqual([expect.objectContaining({ id: f.id, profil: 'KMU', status: 'angemeldet' })]);
   });
 });
+
+describe('Zertifizierung: zwei Profile am selben Tag', () => {
+  it('erlaubt verschiedene Profile, verhindert Dubletten desselben Profils', async () => {
+    const f = await createSaqFall(pool, { kontakt: { email: 'zwei@bank.test', nachname: 'Zwei' }, profil: 'PK' });
+    const ins = (profil: string) => pool.query(
+      `insert into zertifizierung(kontakt_id,typ,profil,ausgestellt_am,gueltig_bis) values ($1,'SAQ Kundenberater Bank',$2,'2026-05-04','2029-05-04')`, [f.kontaktId, profil]);
+    await ins('PK');
+    await ins('IK');
+    await expect(ins('PK')).rejects.toMatchObject({ code: '23505' });
+  });
+});

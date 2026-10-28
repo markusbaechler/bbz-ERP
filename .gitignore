@@ -3,3 +3,10 @@ dist/
 .env
 fm-analyse-out/
 .claude/worktrees/
+
+# Personendaten: Exporte und Importberichte nie einchecken
+*.xlsx
+*.mer
+!test/fixtures/**/*.mer
+KUBA-IMPORT-BERICHT.md
+IMPORT-BERICHT.md
