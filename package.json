@@ -11,6 +11,7 @@
     "migrate": "tsx src/db/migrate.ts",
     "dev": "tsx watch src/server/main.ts",
     "fm:analyse": "tsx tools/fm-analyse/cli.ts",
+    "seed:demo": "tsx src/db/seedDemo.ts",
     "worker": "tsx src/integrations/workerMain.ts"
   },
   "dependencies": {
