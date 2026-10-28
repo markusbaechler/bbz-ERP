@@ -45,6 +45,7 @@ export function alsCsv(kopf: string[], zeilen: unknown[][]): string {
 const TEILNEHMER_SPALTEN: [string, (t: TeilnehmerZeile) => unknown][] = [
   ['Status', (t) => t.status], ['Warteliste', (t) => t.wartelistenPosition], ['Anrede', (t) => t.anrede],
   ['Vorname', (t) => t.vorname], ['Nachname', (t) => t.nachname], ['Organisation', (t) => t.organisation],
+  ['Strasse', (t) => t.strasse], ['PLZ', (t) => t.plz], ['Ort', (t) => t.ort],
   ['Funktion', (t) => t.funktion], ['E-Mail', (t) => t.email], ['Telefon', (t) => t.telefon],
   ['Rechnungsempfaenger', (t) => t.rechnungsempfaenger], ['Referenz', (t) => t.rechnungsreferenz], ['Bemerkung', (t) => t.bemerkung],
 ];
@@ -101,7 +102,7 @@ export function registerBildungRoutes(app: FastifyInstance, pool: pg.Pool): void
   });
   app.get('/anmeldung', async (req) => {
     const q = req.query as any;
-    return listAnmeldungen(pool, { durchfuehrungId: q.durchfuehrungId, kontaktId: q.kontaktId, status: q.status });
+    return listAnmeldungen(pool, { durchfuehrungId: q.durchfuehrungId, kontaktId: q.kontaktId, status: q.status, organisationId: q.organisationId });
   });
   app.get('/anmeldung/:id', async (req, reply) => {
     try { return await getAnmeldung(pool, id(req)); } catch (e) { return fehler(reply, e); }

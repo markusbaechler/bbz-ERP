@@ -107,7 +107,7 @@ describe('bildung-routes', () => {
     expect(c.headers['content-type']).toContain('text/csv');
     expect(c.headers['content-disposition']).toContain('teilnehmerliste-BEF-2026-1.csv');
     const zeilen = c.body.replace(/^﻿/, '').trim().split('\r\n');
-    expect(zeilen[0]).toBe('Status;Warteliste;Anrede;Vorname;Nachname;Organisation;Funktion;E-Mail;Telefon;Rechnungsempfaenger;Referenz;Bemerkung');
+    expect(zeilen[0]).toBe('Status;Warteliste;Anrede;Vorname;Nachname;Organisation;Strasse;PLZ;Ort;Funktion;E-Mail;Telefon;Rechnungsempfaenger;Referenz;Bemerkung');
     expect(zeilen).toHaveLength(3);
     expect(zeilen[1]).toContain('abgeschlossen;;;Anna;"Amrein; ""AA""";');
     expect(zeilen[1]).toContain(";'=SUMME(A1);");

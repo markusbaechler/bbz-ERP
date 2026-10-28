@@ -7,7 +7,8 @@ import {
   listAnmeldungen, updateAnmeldung, teilnehmerliste,
 } from '../src/repos/anmeldungRepo';
 import { createDurchfuehrung, getDurchfuehrung, updateDurchfuehrung, setDurchfuehrungStatus } from '../src/repos/durchfuehrungRepo';
-import { createKontakt } from '../src/repos/kontaktRepo';
+import { createKontakt, updateKontakt } from '../src/repos/kontaktRepo';
+import { createOrganisation } from '../src/repos/organisationRepo';
 import { listLernnachweise } from '../src/repos/lernnachweisRepo';
 import { listOutbox } from '../src/repos/outboxRepo';
 import { listAudit } from '../src/repos/auditRepo';
@@ -301,6 +302,20 @@ describe('Listen', () => {
     const tl = await teilnehmerliste(pool, d.id);
     expect(tl.map((t) => `${t.nachname}:${t.status}`)).toEqual(['Amrein:angemeldet', 'Zuber:angemeldet', 'Aebi:warteliste']);
     expect(tl[2]).toMatchObject({ anmeldungId: w.id, email: 'c@x.test', wartelistenPosition: 1 });
+  });
+  it('Liste nach Institut (FileMaker "Teilnehmerliste pro Bank") und Postadresse fuer Etiketten/Namensschilder', async () => {
+    const bank = await createOrganisation(pool, { name: 'Institut Etikett', strasse: 'Marktgasse 1', plz: '9000', ort: 'St. Gallen' });
+    const d1 = await ausgeschrieben(pool, (await angebot(pool)).id);
+    const d2 = await ausgeschrieben(pool, (await angebot(pool)).id);
+    const a = (await meldeAn(pool, d1.id, { kontakt: person('Ina') })).anmeldung;
+    await updateKontakt(pool, a.kontaktId, { organisationId: bank.id });
+    const b = (await meldeAn(pool, d2.id, { kontaktId: a.kontaktId })).anmeldung;
+    await meldeAn(pool, d2.id, { kontakt: person('Fremd') });   // andere Organisation
+    const liste = await listAnmeldungen(pool, { organisationId: bank.id });
+    expect(liste.map((x) => x.id).sort()).toEqual([a.id, b.id].sort());
+    expect(liste.find((x) => x.id === a.id)).toMatchObject({ durchfuehrungCode: d1.code, durchfuehrungTitel: d1.titel, startDatum: d1.startDatum });
+    const tl = await teilnehmerliste(pool, d1.id);
+    expect(tl[0]).toMatchObject({ organisation: 'Institut Etikett', strasse: 'Marktgasse 1', plz: '9000', ort: 'St. Gallen' });
   });
   it('updateAnmeldung setzt Rechnungsempfaenger/Referenz', async () => {
     const d = await ausgeschrieben(pool, (await angebot(pool)).id);

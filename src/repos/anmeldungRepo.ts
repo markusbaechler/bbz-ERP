@@ -319,22 +319,34 @@ export async function updateAnmeldung(db: Db, id: string, patch: { rechnungsempf
   return mapAnmeldung(r.rows[0]);
 }
 
-export async function listAnmeldungen(db: Db, filter: { durchfuehrungId?: string; kontaktId?: string; status?: string } = {}): Promise<(Anmeldung & { kontaktName: string })[]> {
+export type AnmeldungListenZeile = Anmeldung & {
+  kontaktName: string; durchfuehrungCode: string | null; durchfuehrungTitel: string | null; startDatum: string;
+};
+
+/** organisationId: Anmeldungen der Mitarbeitenden eines Instituts ueber alle Kurse (FileMaker "Liste nach Institut"). */
+export async function listAnmeldungen(db: Db, filter: { durchfuehrungId?: string; kontaktId?: string; status?: string; organisationId?: string } = {}): Promise<AnmeldungListenZeile[]> {
   const cond: string[] = []; const args: unknown[] = [];
   const add = (sql: string, v: unknown) => { args.push(v); cond.push(sql.replace('?', `$${args.length}`)); };
-  if (filter.durchfuehrungId) add('durchfuehrung_id=?', filter.durchfuehrungId);
-  if (filter.kontaktId) add('kontakt_id=?', filter.kontaktId);
-  if (filter.status) add('status = any(?)', filter.status.split(',').map((s) => s.trim()));
+  if (filter.durchfuehrungId) add('a.durchfuehrung_id=?', filter.durchfuehrungId);
+  if (filter.kontaktId) add('a.kontakt_id=?', filter.kontaktId);
+  if (filter.status) add('a.status = any(?)', filter.status.split(',').map((s) => s.trim()));
+  if (filter.organisationId) add('k.organisation_id=?', filter.organisationId);
   const r = await db.query(
-    `select a.*, k.vorname as kontakt_vorname, k.nachname as kontakt_nachname from anmeldung a join kontakt k on k.id=a.kontakt_id
-     ${cond.length ? 'where ' + cond.map((c) => 'a.' + c).join(' and ') : ''} order by a.angemeldet_am, a.id`, args);
-  return r.rows.map((x: any) => ({ ...mapAnmeldung(x), kontaktName: [x.kontakt_vorname, x.kontakt_nachname].filter(Boolean).join(' ') }));
+    `select a.*, k.vorname as kontakt_vorname, k.nachname as kontakt_nachname, d.code as d_code, d.titel as d_titel, d.start_datum as d_start
+     from anmeldung a join kontakt k on k.id=a.kontakt_id join durchfuehrung d on d.id=a.durchfuehrung_id
+     ${cond.length ? 'where ' + cond.join(' and ') : ''} order by a.angemeldet_am, a.id`, args);
+  return r.rows.map((x: any) => ({
+    ...mapAnmeldung(x), kontaktName: [x.kontakt_vorname, x.kontakt_nachname].filter(Boolean).join(' '),
+    durchfuehrungCode: x.d_code, durchfuehrungTitel: x.d_titel, startDatum: x.d_start,
+  }));
 }
 
 export type TeilnehmerZeile = {
   anmeldungId: string; status: Anmeldung['status']; wartelistenPosition: number | null; anrede: string | null;
   vorname: string | null; nachname: string; email: string | null; telefon: string | null; funktion: string | null;
   organisation: string | null; rechnungsempfaenger: string | null; rechnungsreferenz: string | null; bemerkung: string | null;
+  /** Postadresse der Organisation – fuer Etiketten, Namensschilder und Ordneretiketten (Serienbrief/Avery aus der CSV) */
+  strasse: string | null; plz: string | null; ort: string | null;
 };
 
 /** Praesenzliste: alle nicht stornierten Anmeldungen, Teilnehmende alphabetisch, danach die Warteliste. */
@@ -342,7 +354,8 @@ export async function teilnehmerliste(db: Db, durchfuehrungId: string): Promise<
   await getDurchfuehrungBasis(db, durchfuehrungId);
   const r = await db.query(
     `select a.id, a.status, a.wartelisten_position, a.rechnungsreferenz, a.bemerkung, k.anrede, k.vorname, k.nachname,
-            k.email, coalesce(k.telefon, k.mobile) as telefon, k.funktion, o.name as organisation, ag.name as empfaenger
+            k.email, coalesce(k.telefon, k.mobile) as telefon, k.funktion, o.name as organisation, ag.name as empfaenger,
+            o.strasse, o.plz, o.ort
      from anmeldung a join kontakt k on k.id=a.kontakt_id
        left join organisation o on o.id=k.organisation_id left join auftraggeber ag on ag.id=a.rechnungsempfaenger_id
      where a.durchfuehrung_id=$1 and a.status <> 'storniert'
@@ -351,5 +364,6 @@ export async function teilnehmerliste(db: Db, durchfuehrungId: string): Promise<
     anmeldungId: x.id, status: x.status, wartelistenPosition: x.wartelisten_position, anrede: x.anrede, vorname: x.vorname,
     nachname: x.nachname, email: x.email, telefon: x.telefon, funktion: x.funktion, organisation: x.organisation,
     rechnungsempfaenger: x.empfaenger, rechnungsreferenz: x.rechnungsreferenz, bemerkung: x.bemerkung,
+    strasse: x.strasse, plz: x.plz, ort: x.ort,
   }));
 }
