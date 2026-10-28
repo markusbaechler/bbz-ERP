@@ -164,14 +164,17 @@ Regel: max. 1.0 Einsatztage pro Referent:in und Datum (Halbtage kombinierbar); a
 **Konfiguration [belegt: AGB bbz Oktober 2026]:** Annullation öffentlicher Kurse > 30 Tage vor Beginn 0 %, danach 100 % (Ersatzperson kostenlos); Staffel je Angebot austauschbar (SAQ, Projekte). Rezertifizierung: **24 Lernstunden innerhalb von 36 Monaten**, Komponenten Fachwissen/Verhalten je Kurs und Profil [belegt: /rezertifizierung/]. MWSt Standardkurse 0 % (befreit), Nebenkosten (Verpflegung) separat mit Normalsatz [belegt: AGB].
 
 ### 5.4b SAQ-Zertifizierung (Prüfungsadministration)
+Fachmodell und Begriffe übernommen aus **bbz-saq / Reporting KUBA** [belegt: bbz-saq/config.js, glossary.js]: Ein **Zertifizierungsvorgang** (`saq_fall`) = eine Person × ein Profil. Profile **PK, IK, AFFL, CWMA, KMU, CCoB**. Schriftliche Teilprüfungen WE1–WE6, mündlich OE1–OE2, je bis zu **3 Runs** (`saq_pruefung` = ein Run: Datum, Ort, Score, Resultat, Passed, Experte 1/2). Pflichtteile schriftlich PK 1 · IK 1 · AFFL 2 · CWMA 3 · KMU 3 · CCoB 3, mündlich OE1. **Passerelle** PK→IK, AFFL→CWMA, KMU→CCoB = ein schriftlicher Teil. Bestanden **ab 70 %**; massgebend ist „Passed“. Die Website nennt „> 70 %“, der Auftraggeber hat am 10.09.2026 „ab 70 %“ bestätigt.
+
 | Endpoint | Zweck / Regeln |
 |---|---|
-| `GET /saq/fall?status&profil&organisationId`, `POST /saq/fall`, `GET/PATCH /saq/fall/:id` | Zertifizierungsfall: Kontakt, Bank, Profil (PK/IK/AFF/CWMA/KMU/CCOB), Variante, Umfang, Sprache, Einwilligungen (Rechnung an Bank, Datenweitergabe Raiffeisen), Arbeitgeberbestätigung |
+| `GET /saq/fall?status&profil&organisationId&suche`, `POST /saq/fall`, `GET/PATCH /saq/fall/:id` | Vorgang mit Kontakt, Bank, Profil, Variante, Umfang, Sprache, Rolle, Einwilligungen; Ansicht mit `fehlendeTeile`, `passerelleMoeglich`, `passiv` (> 365 Tage ohne Prüfung und ohne Termin) |
 | `POST /saq/fall/:id/arbeitgeberbestaetigung {datum}` | Voraussetzung für die mündliche Prüfung |
-| `POST /saq/fall/:id/pruefung {art, durchfuehrungId?, datum, ort, remote}` | Prüfung einplanen (Termin = Durchführung eines Prüfungsangebots → Kapazität) |
-| `POST /saq/pruefung/:id/resultat {prozent}` | bestanden > 70 %; mündlich nur nach bestandener schriftlicher Prüfung und mit Arbeitgeberbestätigung (409) |
-| `POST /saq/fall/:id/zertifikat {zertifikatNr, ausgestelltAm}` | nach bestandener mündlicher Prüfung: `zertifizierung` (Gültigkeit 3 Jahre) → Rezertifizierungsfrist startet |
-| `GET /saq/kennzahlen?jahr` | Anmeldungen, Prüfungen, Bestehensquote je Profil und Art (Ablösung „Reporting KUBA“) |
+| `POST /saq/fall/:id/pruefung {art, teil, datum, ort, remote, durchfuehrungId?, experte1Id?, experte2Id?}` | nächster Run (max. 3, nur wenn der vorherige nicht bestanden ist); Kapazität über die Durchführung (409) |
+| `POST /saq/pruefung/:id/resultat {resultatProzent?, score?, bestanden?}` | Run 3 nicht bestanden → Vorgang nicht bestanden; alle Pflichtteile schriftlich bestanden → `schriftlich_bestanden`; OE bestanden → `bestanden` |
+| `POST /saq/fall/:id/zertifikat {zertifikatNr, ausgestelltAm}` | → `zertifizierung` (3 Jahre) → Rezertifizierungsfrist läuft |
+| `GET /saq/kennzahlen?jahr` | Vorgänge, Bestehensquote (Nenner = abgeschlossene Vorgänge), Erstversuch-Quoten, Ø Resultat; immer mit n |
+| `GET /saq/export/kuba` | Export im Feldschema von bbz-saq (`we1.run1.result` …). Damit kann das Cockpit das ERP statt der Excel-Datei lesen |
 
 ### 5.5 Finanzen (v1 + Erweiterungen)
 v1 unverändert. Neu: Zeit→Rechnung (§5.3), Anmeldungen→Rechnung (§5.4), **Nebenkosten-Positionen** (eigener MWSt-Satz).
