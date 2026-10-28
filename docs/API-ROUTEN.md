@@ -1,6 +1,6 @@
 # API-Routen (generiert)
 
-Stand: 2026-10-28 · 166 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
+Stand: 2026-10-28 · 174 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
 
 ## Administration & Integration
 
@@ -24,6 +24,7 @@ Stand: 2026-10-28 · 166 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `POST` | `/integration/moodle/abschluss-sync` |
 | `POST` | `/integration/moodle/buchungen` |
 | `POST` | `/integration/moodle/events` |
+| `POST` | `/integration/moodle/kursdaten` |
 | `GET` | `/integration/moodle/status` |
 
 ## Allgemein
@@ -39,6 +40,9 @@ Stand: 2026-10-28 · 166 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `GET` | `/me` |
 | `GET` | `/mwst-satz` |
 | `POST` | `/mwst-satz` |
+| `DELETE` | `/spesen/:id` |
+| `GET` | `/verrechnung/sammelrechnung` |
+| `POST` | `/verrechnung/sammelrechnung` |
 
 ## Bildung
 
@@ -122,6 +126,7 @@ Stand: 2026-10-28 · 166 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `POST` | `/rechnung/:id/def-vereinbart` |
 | `POST` | `/rechnung/:id/festschreiben` |
 | `GET` | `/rechnung/:id/mahnungen` |
+| `POST` | `/rechnung/:id/mail` |
 | `GET` | `/rechnung/:id/pdf` |
 | `POST` | `/rechnung/:id/position` |
 | `POST` | `/rechnung/:id/stornieren` |
@@ -182,6 +187,9 @@ Stand: 2026-10-28 · 166 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `POST` | `/projekt/:id/meilenstein` |
 | `GET` | `/projekt/:id/phase` |
 | `POST` | `/projekt/:id/phase` |
+| `GET` | `/projekt/:id/spesen` |
+| `POST` | `/projekt/:id/spesen` |
+| `POST` | `/projekt/:id/spesen-verrechnen` |
 | `POST` | `/projekt/:id/status` |
 | `POST` | `/projekt/:id/zeit-verrechnen` |
 | `GET` | `/projekt/portfolio` |

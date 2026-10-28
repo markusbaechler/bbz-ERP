@@ -34,7 +34,7 @@ TypeScript · Fastify 4 · PostgreSQL 16 (`pg`) · vitest · Vanilla-JS-PWA (`we
 ```bash
 docker compose up -d          # Postgres auf localhost:5433 (bbz/bbz)
 npm install
-npm test                      # 74 Suiten / 530 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
+npm test                      # 78 Suiten / 550 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
 npx tsc --noEmit
 npm run migrate && npm run seed:demo
 npm run dev                   # http://localhost:3000/app/
@@ -60,10 +60,10 @@ Wichtige Umgebungsvariablen: `.env.example`.
 |---|---|---|
 | Personal/Ressourcen | `mitarbeitendeRepo`, `referentRepo`, `einsatzRepo` (Advisory-Lock gegen Überbuchung) | ✅ |
 | CRM | `organisationRepo`, `kontaktRepo`, `aktivitaetRepo`, `verkaufschanceRepo`, `anfrageRepo`, `crmAuswertungRepo`, `routes/crm.ts` | ✅ |
-| Projektmanagement | `projektRepo`, `phaseRepo`, `meilensteinRepo`, `aufgabeRepo`, `zeiterfassungRepo`, `pmAuswertungRepo`, `domain/cockpit.ts`, `routes/pm.ts` | ✅ |
-| Bildung | `kursangebotRepo`, `durchfuehrungRepo`, `anmeldungRepo` (`meldeAn` mit Zeilensperre), `lernnachweisRepo`, `bildungVerrechnungRepo`, `routes/bildung.ts` | ✅ |
+| Projektmanagement | `projektRepo`, `phaseRepo`, `meilensteinRepo`, `aufgabeRepo`, `zeiterfassungRepo`, `spesenRepo` (Spesen weiterverrechnen), `pmAuswertungRepo`, `domain/cockpit.ts`, `routes/pm.ts` | ✅ |
+| Bildung | `kursangebotRepo`, `durchfuehrungRepo`, `anmeldungRepo` (`meldeAn` mit Zeilensperre), `lernnachweisRepo`, `bildungVerrechnungRepo`, `sammelrechnungRepo` (Sammelrechnung je Bank), `routes/bildung.ts` | ✅ |
 | SAQ | `saqRepo` (KUBA-Modell), `domain/saq.ts`, `routes/saq.ts`, KUBA-Export | ✅ |
-| Finanzen | `rechnungRepo` (Festschreibung, Storno mit Freigabe), `debitorRepo`, `mahnungRepo`, QR/PDF, camt.054-Import (`zahlungImportRepo`, `POST /debitoren/camt054`), Kontenauswertung (`finanzAuswertungRepo`, `GET /finanzen/konten-auswertung`) | ✅ |
+| Finanzen | `rechnungRepo` (Festschreibung, Storno mit Freigabe), `debitorRepo`, `mahnungRepo`, QR/PDF, camt.054-Import (`zahlungImportRepo`, `POST /debitoren/camt054`), Kontenauswertung (`finanzAuswertungRepo`, `GET /finanzen/konten-auswertung`), Rechnung per Mail mit QR-PDF (`POST /rechnung/:id/mail`) | ✅ |
 | Integration | `routes/public.ts`, `publicSchutz.ts`, `integrations/{formulare,webhooks,mail,mailVorlagen,worker}.ts`, `integrations/moodle/*`, `routes/integration.ts`, `widget/bbz-kurse.js` | ✅ |
 | Auth | `authHook.ts` (dev/entra) | ✅ |
 | Migration | `tools/fm-analyse` (DDR, SaveAsXML, Data API, Script-Ausdruck), `tools/fm-import` (Daten; Mapping der bbz-Loesung `mapping.bbz.json`), `tools/kuba-import` (SAQ-Historie aus Reporting_KUBA.xlsx, `docs/analyse/KUBA-IMPORT.md`) | ✅ |
@@ -80,7 +80,11 @@ Wichtige Umgebungsvariablen: `.env.example`.
 1. **FileMaker-Analyse** (28.10.2026, lokale Session mit Computer Use): Kein Konto mit [Vollzugriff], daher kein DDR. Analysiert wurde stattdessen der Script-Ausdruck aller 33 Dateien (Weg D, `ANLEITUNG.md`). Ergebnis und Lückenliste mit Entscheid: `docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md`.
    - Geschlossen: camt.054-Import, Kontenauswertung, Anmeldeliste je Institut, Postadresse in der Teilnehmerliste.
    - Auskunft Fachseite: Mandant IGK nicht mehr aktiv (ins bbz integriert); Kursbriefe, Beurteilung und Statistik laufen im LMS. Lieferschein entfällt.
-   - Zu bauen (in Gebrauch): Sammelrechnung je Bank, Rechnung per Mail mit PDF, Spesen weiterverrechnen.
+   - Gebaut (28.10.2026, mit PWA):
+     - Sammelrechnung je Bank (`sammelrechnungRepo`)
+     - Rechnung per Mail mit QR-PDF (`rechnungPerMail`, Mail-Anhänge)
+     - Spesen weiterverrechnen (`spesenRepo`)
+     - Moodle-Buchungsimport über die Seminarnummer (`importiereKursdatenBericht`)
    - Mit Vollzugriff den DDR nachziehen (Weg A).
 2. **Echte Exporte migrieren** gemäss `docs/filemaker-analyse/MIGRATION.md`: Probelauf, Summenabgleich, `--zaehler-start` = nächste FM-RgNr.
 3. **Moodle (cometas)**: Ist-Stand am 28.10.2026 nur lesend erhoben (`docs/integration/MOODLE.md` §5).
