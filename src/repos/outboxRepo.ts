@@ -4,7 +4,8 @@ import type { Db } from './db';
 export type OutboxTyp =
   | 'moodle.einschreiben'      // payload: { anmeldungId }
   | 'moodle.ausschreiben'      // payload: { anmeldungId }
-  | 'webhook'                  // payload: { ereignis, daten }
+  | 'webhook'                  // payload: { ereignis, daten } -> Verteilung auf Abos
+  | 'webhook.zustellung'       // payload: { aboId, ereignis, daten, ereignisId }
   | 'mail';                    // payload: { vorlage, an, daten }
 
 export type OutboxEintrag = {

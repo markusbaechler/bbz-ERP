@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "migrate": "tsx src/db/migrate.ts",
     "dev": "tsx watch src/server/main.ts",
-    "fm:analyse": "tsx tools/fm-analyse/cli.ts"
+    "fm:analyse": "tsx tools/fm-analyse/cli.ts",
+    "worker": "tsx src/integrations/workerMain.ts"
   },
   "dependencies": {
     "@types/pdfkit": "^0.17.6",
