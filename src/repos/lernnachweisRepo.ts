@@ -114,7 +114,8 @@ export type Rezertifizierung = RezertifizierungsStatus & { zertifizierung: Zerti
 export async function getRezertifizierung(db: Db, id: string, opt: { heute?: string } = {}): Promise<Rezertifizierung> {
   const z = await getZertifizierung(db, id);
   const lernnachweise = await listLernnachweise(db, z.kontaktId, { von: z.ausgestelltAm, bis: z.gueltigBis });
-  return { ...rezertifizierungsStatus(z, lernnachweise, { heute: opt.heute }), zertifizierung: z, lernnachweise };
+  const heute = opt.heute === undefined ? undefined : pruefeDatum(opt.heute, 'heute');
+  return { ...rezertifizierungsStatus(z, lernnachweise, { heute }), zertifizierung: z, lernnachweise };
 }
 
 export type FaelligeRezertifizierung = RezertifizierungsStatus & {
