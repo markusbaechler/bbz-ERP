@@ -42,8 +42,19 @@ bbz (Bankenberatungszentrum, bbz st.gallen ag) ist ein Bildungs- und Beratungsan
 - **Qualität/Lernwirkung:** Moodle-Kursabschluss als Nachweis. Das Moodle-Audit (BEF) zeigt fehlende Lernstandsdaten [belegt: Audit]. Das ERP übernimmt deshalb zunächst nur den **Abschlussstatus**, nicht Noten.
 - **Datenschutz (nDSG):** Einwilligungsnachweis für Newsletter/Marketing, Datensparsamkeit an Schnittstellen, Datenstandort CH.
 
-### 2.3 Website-Befunde
-Wird aus der Website-Recherche ergänzt (Angebotsstruktur, Anmeldefelder, AGB/Annullierung, CMS). Bis dahin gelten die Default-Annahmen in §5.4 und §6.1 als [Hypothese].
+### 2.3 Website-Befunde (Recherche 28.10.2026, Details: `docs/analyse/WEBSITE-GESCHAEFTSPROZESSE.md`)
+| Befund | Konsequenz fürs ERP |
+|---|---|
+| Website = WordPress/Elementor (Hostpoint); 52 Kurse als Custom Post Type `kurs` mit Taxonomien Kursbereich, Kurstyp, Berufsprofil, Kompetenzfeld [belegt] | `kursangebot.homepage_post_id`, Felder Bereich/Format/Profile; Katalog-API kann das Moodle-Termin-Plugin später ersetzen |
+| **Öffentliche Kurse werden in Moodle gebucht** (Face-to-Face-Sessions, Plugin `moodle-f2f-display` zeigt Termine; Login in Moodle Pflicht) [belegt] | ERP übernimmt **Buchungen aus Moodle** (Sync/Import je Session → `anmeldung`, Quelle `moodle`); `durchfuehrung.moodle_session_id` |
+| Formulare (SAQ-Anmeldung in 5 Schritten, DLP, BFK UNO, Führungseinstieg, Kontakt, ÜK/BEM, Clientis) = **WPForms → Zapier → SharePoint/M365** [belegt] | **Formular-Eingang** `POST /public/v1/formulare/:formular` (Zapier/WPForms-Webhook) mit Mapping je Formular → Anfrage, Anmeldung oder SAQ-Fall |
+| Moodle 4.5 „mybbz“ unter cometas.bankenberatungszentrum.ch, Betreiber cometas.ch gmbh, Selbstregistrierung aktiv, Profilfelder Profil/Funktion/Geburtsdatum [belegt] | Benutzer immer zuerst per E-Mail suchen, nur bei Bedarf anlegen; Web-Service-Token bei cometas beantragen |
+| AGB: öffentliche Kurse > 30 Tage vor Beginn kostenlos, sonst 100 %; Ersatzperson kostenlos. SAQ: CHF 300 ab 30 Tagen, voller Preis ab 10 Arbeitstagen (mit Arztzeugnis CHF 300), CHF 150 Admin-Gebühr. Projekte: 90/60/30-Tage-Staffel je Einsatztag [belegt] | Annullationsregel je Angebot (`kursangebot.annullationsregel`), datengetriebene Staffeln |
+| Rechnung nach Veranstaltung, **30 Tage**; 1. Erinnerung mit 10 Tagen Frist, **ab 2. Erinnerung CHF 50** [belegt] | **Mahnwesen** in v2 (nicht erst v2.1) |
+| Standardkurse MWSt-befreit; Verpflegung/Beherbergung separat; Tailor-made MWSt-pflichtig [belegt] | Nebenkosten als eigene Position mit eigenem MWSt-Satz (`kursangebot.nebenkosten_*`) |
+| SAQ „Kundenberater Bank“: 6 Profile (PK, IK, Affluent, CWMA, KMU, CCoB), Teilprüfungen, schriftlich > 70 %, mündlich > 70 %, Arbeitgeberbestätigung Pflicht, 300+ Zertifizierungen/Jahr; Rezertifizierung 24 LS / 36 Monate mit Komponenten Fachwissen/Verhalten je Kurs und Profil [belegt] | **SAQ-Modul** (§5.4b): Zertifizierungsfall, Prüfungen, Resultate, Zertifikat; Lernnachweise mit Komponenten |
+| Bankengruppen (Raiffeisen, Clientis) mit eigenen Seiten/Formularen [belegt], vermutlich Rahmenverträge [Hypothese] | `organisation.gruppe_id` (Bankengruppe) |
+| Prüfungs- und Kurstermine heute **doppelt gepflegt** (Elementor-Listen + Formular-Dropdowns + Moodle) [belegt] | ERP als **einziges Terminstammdatum**, Ausgabe per API/Widget |
 
 ## 3. FileMaker-Funktionsumfang und Ablösung
 
@@ -150,35 +161,51 @@ Regel: max. 1.0 Einsatztage pro Referent:in und Datum (Halbtage kombinierbar); a
 | `GET/POST /zertifizierung`, `GET /zertifizierung/:id/rezertifizierung` | Lernstunden im Gültigkeitszeitraum vs. Soll |
 | `GET /bildung/rezertifizierung/faellig?innertMonaten=6` | ablaufende Zertifikate mit fehlenden Lernstunden (Vertriebschance) |
 
-**Konfiguration [Hypothese, gegen AGB zu verifizieren]:** Annullation ≥ 30 Tage vor Beginn 0 %, 29–14 Tage 50 %, < 14 Tage 100 % (Ersatzteilnehmer:in kostenlos). Rezertifizierung: **24 Lernstunden innerhalb der 36-monatigen Gültigkeit** [belegt: Positionspapier Compliance-Lernplattform, Juni 2026]. MWSt Bildung 0 % (von der Steuer ausgenommen) [Hypothese, Treuhand prüfen].
+**Konfiguration [belegt: AGB bbz Oktober 2026]:** Annullation öffentlicher Kurse > 30 Tage vor Beginn 0 %, danach 100 % (Ersatzperson kostenlos); Staffel je Angebot austauschbar (SAQ, Projekte). Rezertifizierung: **24 Lernstunden innerhalb von 36 Monaten**, Komponenten Fachwissen/Verhalten je Kurs und Profil [belegt: /rezertifizierung/]. MWSt Standardkurse 0 % (befreit), Nebenkosten (Verpflegung) separat mit Normalsatz [belegt: AGB].
+
+### 5.4b SAQ-Zertifizierung (Prüfungsadministration)
+| Endpoint | Zweck / Regeln |
+|---|---|
+| `GET /saq/fall?status&profil&organisationId`, `POST /saq/fall`, `GET/PATCH /saq/fall/:id` | Zertifizierungsfall: Kontakt, Bank, Profil (PK/IK/AFF/CWMA/KMU/CCOB), Variante, Umfang, Sprache, Einwilligungen (Rechnung an Bank, Datenweitergabe Raiffeisen), Arbeitgeberbestätigung |
+| `POST /saq/fall/:id/arbeitgeberbestaetigung {datum}` | Voraussetzung für die mündliche Prüfung |
+| `POST /saq/fall/:id/pruefung {art, durchfuehrungId?, datum, ort, remote}` | Prüfung einplanen (Termin = Durchführung eines Prüfungsangebots → Kapazität) |
+| `POST /saq/pruefung/:id/resultat {prozent}` | bestanden > 70 %; mündlich nur nach bestandener schriftlicher Prüfung und mit Arbeitgeberbestätigung (409) |
+| `POST /saq/fall/:id/zertifikat {zertifikatNr, ausgestelltAm}` | nach bestandener mündlicher Prüfung: `zertifizierung` (Gültigkeit 3 Jahre) → Rezertifizierungsfrist startet |
+| `GET /saq/kennzahlen?jahr` | Anmeldungen, Prüfungen, Bestehensquote je Profil und Art (Ablösung „Reporting KUBA“) |
 
 ### 5.5 Finanzen (v1 + Erweiterungen)
-v1 unverändert. Neu: Zeit→Rechnung (§5.3), Anmeldungen→Rechnung (§5.4). Mahnwesen und camt-Import folgen in v2.1.
+v1 unverändert. Neu: Zeit→Rechnung (§5.3), Anmeldungen→Rechnung (§5.4), **Nebenkosten-Positionen** (eigener MWSt-Satz).
+**Mahnwesen [belegt: AGB]:** Fälligkeit = Rechnungsdatum + `zahlungsfrist_tage` (Default 30). `GET /debitoren/mahnvorschlag?stichtag` listet überfällige offene Posten mit nächster Stufe. `POST /debitoren/mahnlauf {stichtag, rechnungIds?}` (Admin) erzeugt Mahnungen: Stufe 1 = Erinnerung, Frist 10 Tage, ohne Gebühr; ab Stufe 2 CHF 50 Gebühr; max. Stufe 3, danach Inkasso-Liste. Eine neue Stufe entsteht erst nach Ablauf der Frist der vorherigen. camt-Import folgt in v2.1.
 
 ### 5.6 Dashboard / Reporting
 `GET /dashboard` aggregiert: meine Aufgaben (überfällig/Woche), Wiedervorlagen, neue Anfragen, Pipeline gewichtet, Projekte mit Ampel ≠ grün, nächste Durchführungen mit Belegung, offene Posten total, Outbox-Fehler.
 
 ## 6. Integrationen
 
-### 6.1 Homepage
-- **Public API v1** (`/public/v1`, Header `x-api-key`, Scopes, CORS-Whitelist je Client, Rate-Limit):
-  - `GET /public/v1/kurse?bereich` → öffentliche, aktive Angebote mit ausgeschriebenen Durchführungen (Termine, Ort, Preis, **freie Plätze**, Warteliste möglich)
-  - `GET /public/v1/kurse/:slug`
-  - `POST /public/v1/anmeldungen` (Header `idempotency-key`) → `meldeAn()`; Antwort: Status `angemeldet`/`warteliste`
-  - `POST /public/v1/anfragen` → CRM-Anfrage (Kontaktformular, Offertanfrage, Newsletter mit Einwilligung)
-- **Einbettung:** `GET /widget/bbz-kurse.js` (Vanilla, kein Framework) rendert Kurskatalog und Anmeldeformular per `<div data-bbz-kurse>`; nutzt einen **publishable key** mit Scopes `public:read`, `public:anmeldung` und Origin-Bindung.
-- **Webhooks (ausgehend):** `kurs.aktualisiert`, `anmeldung.eingegangen`, `anmeldung.bestaetigt`, `anmeldung.storniert`; signiert mit `x-bbz-signature: sha256=HMAC(secret, body)` und `x-bbz-ereignis`.
+### 6.1 Homepage (WordPress/Elementor/WPForms)
+- **Formular-Eingang (ersetzt Zapier → SharePoint):** `POST /public/v1/formulare/:formular` mit Header `x-api-key` (Scope `public:formular`). Zapier („Webhooks by Zapier“) oder das WPForms-Webhook-Addon senden die Felder als JSON. Ein **Mapping je Formular** (`src/integrations/formulare.ts`) übersetzt die Felder:
+  - `kontakt`, `anfrage-uek-bem`, `clientis` → CRM-**Anfrage**
+  - `anmeldung` (Kurs mit ERP-Durchführung), `dlp`, `bfk-uno`, `fuehrungseinstieg` → **Anmeldung** (falls die Durchführung bekannt ist), sonst Anfrage vom Typ `offerte`
+  - `saq-anmeldung` → **SAQ-Zertifizierungsfall** (+ Kontakt, Bank-Zuordnung über Namen)
+  - Rohdaten bleiben im Payload der Anfrage nachvollziehbar. Idempotenz per Header `idempotency-key` (z. B. WPForms-Entry-ID).
+- **Public API v1** (Header `x-api-key`, Scopes, CORS-Whitelist, Rate-Limit):
+  - `GET /public/v1/kurse?bereich` und `GET /public/v1/kurse/:slug`: öffentliche Angebote mit Durchführungen und freien Plätzen. Ersetzt die doppelte Terminpflege.
+  - `POST /public/v1/anmeldungen` (Header `idempotency-key`): direkte Anmeldung über das ERP-Widget
+  - `POST /public/v1/anfragen`
+- **Widget** `GET /widget/bbz-kurse.js`: Vanilla-JS, `<div data-bbz-kurse data-bereich="Banking">` rendert Termine mit freien Plätzen und optional das Anmeldeformular. Es ist mit Elementor über ein HTML-Widget einbindbar und braucht einen publishable key mit Origin-Bindung.
+- **Webhooks (ausgehend):** `kurs.aktualisiert`, `anmeldung.eingegangen`, `anmeldung.bestaetigt`, `anmeldung.storniert`. Signatur: `x-bbz-signature: sha256=<HMAC(secret, timestamp.body)>`, Header `x-bbz-timestamp` und `x-bbz-ereignis`.
 
-### 6.2 Moodle
-- **Moodle Web Services (REST)**, Token eines dedizierten Service-Users. Benötigte Funktionen: `core_user_get_users_by_field`, `core_user_create_users`, `enrol_manual_enrol_users`, `enrol_manual_unenrol_users`, `core_course_get_courses_by_field`, `core_completion_get_course_completion_status`, `core_enrol_get_enrolled_users`.
+### 6.2 Moodle (mybbz, Moodle 4.5, Betrieb cometas)
+- **Web Services (REST)** mit dem Token eines Service-Users. Benötigt: `core_webservice_get_site_info`, `core_user_get_users_by_field`, `core_user_create_users`, `enrol_manual_enrol_users`, `enrol_manual_unenrol_users`, `core_completion_get_course_completion_status`, `core_enrol_get_enrolled_users`.
 - **Abläufe:**
-  1. Anmeldung bestätigt → Outbox `moodle.einschreiben` → Benutzer per E-Mail suchen/anlegen (`auth=manual` oder SSO-Plugin), Kontakt erhält `moodleUserId` → Einschreibung in `durchfuehrung.moodleKursId` (Rolle Student, `timestart` = 14 Tage vor Kursbeginn [Hypothese: Lernreise vor Präsenz], `timeend` = Kursende + 60 Tage) → `moodleStatus=eingeschrieben`.
-  2. Storno/Absage → `moodle.ausschreiben`.
-  3. **Kursabschluss:** Pull-Job `POST /integration/moodle/abschluss-sync` (Cron) liest Completion je eingeschriebener Anmeldung → `abgeschlossen` + Lernnachweis. Optional Push: Moodle-Event-Observer/Webhook-Plugin → `POST /integration/moodle/events` (HMAC-signiert, `\core\event\course_completed`).
-- Fehler werden in der Outbox sichtbar (Status, letzter Fehler, Wiederholen-Button).
+  1. **Einschreibung (Lernreise/Blended):** Anmeldung bestätigt → Outbox `moodle.einschreiben` → Benutzer per E-Mail suchen, sonst anlegen. `kontakt.moodle_user_id` wird gesetzt. Dann manuelle Einschreibung in `durchfuehrung.moodle_kurs_id`: Rolle Student; Start 14 Tage vor Kursbeginn, Ende 60 Tage nach Kursende (Konfig).
+  2. **Ausschreibung** bei Storno oder Absage.
+  3. **Kursabschluss:** `POST /integration/moodle/abschluss-sync` (Cron) liest die Completion je eingeschriebener Anmeldung → `abgeschlossen` + Lernnachweis. Optional als Push über ein Moodle-Event-Plugin: `POST /integration/moodle/events` mit HMAC-Signatur.
+  4. **Buchungen aus Moodle (Face-to-Face):** Solange Moodle der Buchungskanal ist, übernimmt `POST /integration/moodle/buchungen` die Teilnehmenden einer Session (`durchfuehrung.moodle_session_id`) als CSV-Export der Face-to-Face-Teilnehmerliste oder als JSON → `meldeAn(quelle='moodle')`, idempotent pro Session+E-Mail. [Hypothese] Ob das Face-to-Face-Plugin von cometas Web-Service-Funktionen für Signups anbietet, prüft `GET /integration/moodle/status` (`get_site_info` listet die freigegebenen Funktionen). Sind sie vorhanden, wird der Import automatisiert.
+- Fehler sind in der Outbox sichtbar (Status, letzter Fehler, „Wiederholen“).
 
 ### 6.3 Microsoft 365
-Entra ID für Login (§4). Das PDF-Archiv auf SharePoint bleibt optional (v1 §3).
+Login über Entra ID (§4). Mail-Versand über Microsoft Graph `sendMail`: App-Registrierung mit Client Credentials, Absender-Postfach konfigurierbar. Adapter `protokoll` für Tests und Entwicklung.
 
 ## 7. Nichtfunktionale Anforderungen
 nDSG: Einwilligungszeitpunkt und Quelle, Export nur mit Einwilligung, Public-API gibt keine Personendaten heraus. Datenstandort CH (Azure Switzerland North). Audit-Log für Festschreibung, Storno, Statuswechsel und Verrechnungsläufe. Idempotenz für öffentliche POSTs. Secrets ausschliesslich über Umgebungsvariablen.
@@ -187,7 +214,8 @@ nDSG: Einwilligungszeitpunkt und Quelle, Export nur mit Einwilligung, Public-API
 `tools/fm-import`: CSV-Exporte (Auftraggeber, Projekte, Kontakte/Teilnehmende) → Upsert mit Mapping-Datei, Zählerstartwert `rechnung_lfd_nr` = FileMaker-Maximum, Summenreport zur Validierung.
 
 ## 9. Offene Punkte
-- AGB-Annullierungsstaffel, Zahlungsfrist und MWSt-Behandlung je Angebot verbindlich klären.
-- Moodle-Instanz-URL, Auth-Plugin (manual/OIDC) und Rolle-ID des Service-Users.
-- Homepage-CMS bestätigen (Widget vs. Plugin) und Origin-Liste festlegen.
+- Moodle (cometas): Web-Service-Token, freigegebene Funktionen, Face-to-Face-Signups per Web Service verfügbar?, Rolle-ID Student, Auth-Plugin der Selbstregistrierung.
+- Zapier/WPForms: Umstellung der Zaps von SharePoint auf `/public/v1/formulare/:formular`; Feldnamen der Formulare gegen Mapping prüfen.
+- Rahmenverträge/Preise der Bankengruppen (Raiffeisen, Clientis) als Preisregeln abbilden?
+- Nebenkosten-Modelle (Tagespauschale je Jahr vs. effektiv) und Staffelpreise (SAQ-Vorbereitung) als Preisregeln.
 - DDR aus FileMaker liefern → Abdeckungsmatrix schliessen.
