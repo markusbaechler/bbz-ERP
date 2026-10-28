@@ -12,6 +12,7 @@
     "dev": "tsx watch src/server/main.ts",
     "fm:analyse": "tsx tools/fm-analyse/cli.ts",
     "seed:demo": "tsx src/db/seedDemo.ts",
+    "test:e2e": "node test/e2e/smoke.mjs",
     "worker": "tsx src/integrations/workerMain.ts"
   },
   "dependencies": {
