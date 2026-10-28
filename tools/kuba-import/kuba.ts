@@ -97,6 +97,9 @@ type Feld = { key: string; kandidaten: string[]; pflicht: 'beide' | 'issued' | '
 
 const runKey = (kind: Kind, teil: number, run: number, was: string) => `${kind}${teil}.run${run}.${was}`;
 const teilKey = (kind: Kind, teil: number) => `${kind}${teil}.passed`;
+/** Feldschluessel eines Run-Felds (z. B. "we1.run2.date") fuer Vorgang.headerName. */
+export const runFeld = (art: SaqPruefungArt, teil: number, run: number, was: 'passed' | 'date' | 'result' | 'score' | 'location' | 'expert1' | 'expert2') =>
+  runKey(art === 'schriftlich' ? 'we' : 'oe', teil, run, was);
 
 function bildeFelder(): Feld[] {
   const f: Feld[] = [
