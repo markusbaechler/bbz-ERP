@@ -6,7 +6,7 @@
  */
 import * as XLSXns from 'xlsx';
 
-const XLSX: typeof XLSXns = (XLSXns as any).read ? XLSXns : (XLSXns as any).default;
+const XLSX: typeof XLSXns = (XLSXns as any).default?.SSF ? (XLSXns as any).default : XLSXns;
 
 /** Zellwert: Text/Zahl/Boolean, Datum mit Datumsformat ({ datum: 'YYYY-MM-DD' }), Excel-Fehler ({ fehler: '#N/A' }). */
 export type TestZelle = string | number | boolean | { datum: string } | { fehler: '#N/A' | '#VALUE!' } | null | undefined;

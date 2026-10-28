@@ -25,8 +25,9 @@ import { BANK_ALIASE } from '../../src/config/bankAliase';
 import { gueltigBis } from '../../src/domain/saq';
 import type { SaqProfil, SaqSprache, SaqStatus, SaqPruefungArt } from '../../src/domain/saqTypes';
 
-// SheetJS: unter vitest/ESM benannte Exporte (xlsx.mjs), unter tsx/Node das CommonJS-Modul (default)
-const XLSX: typeof XLSXns = (XLSXns as any).read ? XLSXns : (XLSXns as any).default;
+// SheetJS: unter tsx/Node das CommonJS-Modul (vollstaendig nur als default; der Namespace erkennt nicht alle Exporte,
+// z. B. fehlt SSF), unter vitest xlsx.mjs mit benannten Exporten und ohne default
+const XLSX: typeof XLSXns = (XLSXns as any).default?.SSF ? (XLSXns as any).default : XLSXns;
 
 export const KUBA = {
   sheets: { first: 'First Certification', issued: 'Ausgestellte Zertifikate' },
