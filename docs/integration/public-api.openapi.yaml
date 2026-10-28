@@ -1,0 +1,152 @@
+openapi: 3.0.3
+info:
+  title: bbz-ERP Public API (Homepage)
+  version: 1.0.0
+  description: |
+    Öffentliche Schnittstelle für die Website bankenberatungszentrum.ch und Formular-Weiterleitungen (Zapier/WPForms).
+    Authentisierung über `x-api-key` (Schlüssel je Client, mit Scopes und Origin-Bindung). POSTs sind idempotent über den
+    Header `idempotency-key`: Eine Wiederholung liefert die erste Antwort, mit `idempotent-replayed: true`.
+    Antworten enthalten keine Personendaten. Fehler kommen als `{ "error": "...", "fehler"?: ["..."] }`.
+servers:
+  - url: https://erp.bankenberatungszentrum.ch
+security:
+  - apiKey: []
+components:
+  securitySchemes:
+    apiKey: { type: apiKey, in: header, name: x-api-key }
+  parameters:
+    Idempotenz:
+      name: idempotency-key
+      in: header
+      required: false
+      schema: { type: string, maxLength: 200 }
+      description: z. B. WPForms-Entry-ID oder eine UUID je Formularanzeige
+  schemas:
+    Kurstag: { type: object, properties: { datum: { type: string, format: date }, von: { type: string, nullable: true }, bis: { type: string, nullable: true } } }
+    Durchfuehrung:
+      type: object
+      properties:
+        code: { type: string, example: BEF-2027-1 }
+        startDatum: { type: string, format: date }
+        endDatum: { type: string, format: date }
+        ort: { type: string, nullable: true }
+        kurstage: { type: array, items: { $ref: '#/components/schemas/Kurstag' } }
+        preisChf: { type: number, nullable: true }
+        freiePlaetze: { type: integer }
+        wartelisteMoeglich: { type: boolean }
+        anmeldeschluss: { type: string, format: date, nullable: true }
+    Kurs:
+      type: object
+      properties:
+        code: { type: string }
+        slug: { type: string }
+        titel: { type: string }
+        untertitel: { type: string, nullable: true }
+        bereich: { type: string, example: Banking }
+        format: { type: string, enum: [praesenz, blended, online, e_learning] }
+        beschreibung: { type: string, nullable: true }
+        lernziele: { type: string, nullable: true }
+        zielgruppe: { type: string, nullable: true }
+        dauerTage: { type: number, nullable: true }
+        lernstunden: { type: number, nullable: true }
+        preisChf: { type: number, nullable: true }
+        saqAnerkannt: { type: boolean }
+        durchfuehrungen: { type: array, items: { $ref: '#/components/schemas/Durchfuehrung' } }
+    Person:
+      type: object
+      required: [nachname, email]
+      properties:
+        anrede: { type: string, enum: [Frau, Herr] }
+        vorname: { type: string }
+        nachname: { type: string }
+        email: { type: string, format: email }
+        telefon: { type: string }
+        funktion: { type: string }
+    Quittung:
+      type: object
+      properties:
+        status: { type: string, example: angemeldet, description: 'angemeldet | warteliste | eingegangen | in_pruefung' }
+        warteliste: { type: boolean }
+        wartelistenPosition: { type: integer, nullable: true }
+        referenz: { type: string, format: uuid }
+    Fehler: { type: object, properties: { error: { type: string }, fehler: { type: array, items: { type: string } } } }
+paths:
+  /public/v1/kurse:
+    get:
+      summary: Öffentliche Kurse mit buchbaren Durchführungen und freien Plätzen (Scope public:read)
+      parameters: [{ name: bereich, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: Kurse, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Kurs' } } } } }
+        '401': { description: Schlüssel fehlt/ungültig }
+        '403': { description: Scope oder Origin nicht erlaubt }
+  /public/v1/kurse/{slug}:
+    get:
+      summary: Ein Kurs (Scope public:read)
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Kurs, content: { application/json: { schema: { $ref: '#/components/schemas/Kurs' } } } }
+        '404': { description: nicht gefunden }
+  /public/v1/anmeldungen:
+    post:
+      summary: Anmeldung zu einer Durchführung (Scope public:anmeldung); bei vollem Kurs Warteliste
+      parameters: [{ $ref: '#/components/parameters/Idempotenz' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [durchfuehrungCode, kontakt, datenschutz, agb]
+              properties:
+                durchfuehrungCode: { type: string, example: BEF-2027-1 }
+                kontakt: { $ref: '#/components/schemas/Person' }
+                organisation: { type: string, description: 'Bank/Arbeitgeber als Text; Zuordnung erfolgt serverseitig' }
+                rechnungsreferenz: { type: string }
+                bemerkung: { type: string }
+                datenschutz: { type: boolean, enum: [true] }
+                agb: { type: boolean, enum: [true] }
+      responses:
+        '201': { description: angemeldet oder Warteliste, content: { application/json: { schema: { $ref: '#/components/schemas/Quittung' } } } }
+        '202': { description: Durchführung unbekannt – als Anfrage zur Prüfung erfasst }
+        '400': { description: Eingaben ungültig, content: { application/json: { schema: { $ref: '#/components/schemas/Fehler' } } } }
+        '404': { description: Durchführung nicht öffentlich }
+        '409': { description: bereits angemeldet / Anmeldung geschlossen }
+        '429': { description: Rate-Limit }
+  /public/v1/anfragen:
+    post:
+      summary: Kontakt-, Offert-, Rückruf- oder Newsletter-Anfrage (Scope public:anfrage)
+      parameters: [{ $ref: '#/components/parameters/Idempotenz' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                typ: { type: string, enum: [kontakt, offerte, tailormade, newsletter, rueckruf] }
+                anrede: { type: string }
+                vorname: { type: string }
+                nachname: { type: string }
+                email: { type: string, format: email }
+                telefon: { type: string }
+                organisation: { type: string }
+                funktion: { type: string }
+                interesse: { type: string }
+                nachricht: { type: string }
+                newsletter: { type: boolean }
+                einwilligung: { type: boolean, description: 'Pflicht bei Newsletter (nDSG)' }
+      responses:
+        '201': { description: eingegangen, content: { application/json: { schema: { $ref: '#/components/schemas/Quittung' } } } }
+        '400': { description: ungültig }
+  /public/v1/formulare/{formular}:
+    post:
+      summary: Formular-Eingang WPForms/Zapier (Scope public:formular); Felder mit Website-Beschriftungen als Schlüssel
+      parameters:
+        - { name: formular, in: path, required: true, schema: { type: string, enum: [kontakt, anfrage-uek-bem, clientis, saq-anmeldung, dlp, bfk-uno, fuehrungseinstieg, anmeldung] } }
+        - { $ref: '#/components/parameters/Idempotenz' }
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+      responses:
+        '201': { description: 'verarbeitet (Anfrage, Anmeldung oder SAQ-Vorgang)', content: { application/json: { schema: { $ref: '#/components/schemas/Quittung' } } } }
+        '202': { description: zur Prüfung erfasst }
+        '404': { description: unbekanntes Formular }
+        '422': { description: Pflichtangaben fehlen, content: { application/json: { schema: { $ref: '#/components/schemas/Fehler' } } } }
