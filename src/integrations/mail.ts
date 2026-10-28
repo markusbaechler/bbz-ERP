@@ -2,7 +2,8 @@
  * Mail-Versand (Spec v2 §6.3): Microsoft Graph sendMail (M365, Client Credentials) oder Protokoll-Adapter
  * (Entwicklung/Tests). Versand ausschliesslich ueber die Outbox (Typ "mail") -> Wiederholung bei Fehlern.
  */
-export type Mail = { an: string; betreff: string; text: string; html?: string; cc?: string[] };
+export type Anhang = { name: string; typ: string; inhalt: Buffer };
+export type Mail = { an: string; betreff: string; text: string; html?: string; cc?: string[]; anhaenge?: Anhang[] };
 
 export interface MailAdapter { sende(m: Mail): Promise<void> }
 
@@ -40,6 +41,9 @@ export class GraphMailAdapter implements MailAdapter {
           body: m.html ? { contentType: 'HTML', content: m.html } : { contentType: 'Text', content: m.text },
           toRecipients: [{ emailAddress: { address: m.an } }],
           ccRecipients: (m.cc ?? []).map((a) => ({ emailAddress: { address: a } })),
+          ...(m.anhaenge?.length ? { attachments: m.anhaenge.map((a) => ({
+            '@odata.type': '#microsoft.graph.fileAttachment', name: a.name, contentType: a.typ, contentBytes: a.inhalt.toString('base64'),
+          })) } : {}),
         },
         saveToSentItems: true,
       }),

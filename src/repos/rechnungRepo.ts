@@ -5,6 +5,7 @@ import { ValidationError, NotFoundError } from '../domain/errors';
 import { getProjektById } from './projektRepo';
 import { type Db, inTransaktion } from './db';
 import { audit } from './auditRepo';
+import { enqueue } from './outboxRepo';
 
 const mapR = (r: any): Rechnung => ({
   id: r.id, projektId: r.projekt_id, auftraggeberId: r.auftraggeber_id, datum: r.datum,
@@ -153,4 +154,22 @@ export async function stornieren(pool: pg.Pool, id: string, grund?: string, benu
         freigegeben: { zeiteintraege: z.rowCount, anmeldungen: a.rowCount, saqFaelle: f.rowCount } } });
     return { ...mapR(upd.rows[0]), gutschrift: mapR(g.rows[0]) };
   });
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Rechnung per E-Mail (FileMaker "Rechnung Mail"): nur festgeschriebene Belege. Die Outbox erhaelt Vorlage und ID;
+ * das QR-PDF entsteht beim Versand (Mail-Vorlage "rechnung"). Empfaenger: angegebene Adresse, sonst die des Debitors.
+ */
+export async function rechnungPerMail(db: Db, id: string, an: string | null | undefined, benutzer: string | null = null): Promise<{ outboxId: number; an: string }> {
+  const r = await getRechnung(db, id);
+  if (r.status !== 'abgerechnet' && r.status !== 'bezahlt') throw new ValidationError(`Nur festgeschriebene Rechnungen per Mail (Status ${r.status})`);
+  const ziel = an?.trim() || (await db.query('select email from auftraggeber where id=$1', [r.auftraggeberId])).rows[0]?.email || null;
+  if (!ziel) throw new ValidationError('Keine E-Mail-Adresse beim Debitor hinterlegt');
+  if (!EMAIL.test(ziel)) throw new ValidationError(`Ungueltige E-Mail-Adresse: ${ziel}`);
+  // Nur eine ausdruecklich angegebene Adresse kommt in die Outbox; die des Debitors liest die Vorlage beim Versand.
+  const outboxId = await enqueue(db, 'mail', id, { vorlage: 'rechnung', an: an?.trim() || null, daten: { rechnungId: id } });
+  await audit(db, { benutzer, aktion: 'rechnung_mail', entitaet: 'rechnung', entitaetId: id, details: { outboxId } });
+  return { outboxId, an: ziel };
 }

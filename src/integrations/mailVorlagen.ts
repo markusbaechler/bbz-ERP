@@ -1,5 +1,8 @@
 import type pg from 'pg';
 import type { Mail } from './mail';
+import { getRechnung, listPositionen } from '../repos/rechnungRepo';
+import { getAuftraggeberById } from '../repos/auftraggeberRepo';
+import { erzeugeRechnungPdf } from '../pdf/rechnungPdf';
 
 /*
  * Mail-Vorlagen. Die Outbox speichert nur Vorlage + IDs; Inhalte werden erst beim Versand aus der DB gelesen
@@ -70,6 +73,19 @@ const VORLAGEN: Record<string, Vorlage> = {
       text: `Guten Tag\n\nGemäss unserer Buchhaltung ist die Rechnung ${x.nummer} vom ${datumCh(x.datum)} über ${chf(Number(x.total_brutto))} `
         + `noch mit ${chf(Number(x.offen_chf ?? x.total_brutto))} offen. Wir bitten Sie, den Betrag bis ${x.frist_bis ? datumCh(x.frist_bis) : 'in 10 Tagen'} zu überweisen`
         + `${gebuehr > 0 ? `; für diese Mahnung verrechnen wir eine Gebühr von ${chf(gebuehr)} (AGB)` : ''}. Sollte sich Ihre Zahlung mit diesem Schreiben gekreuzt haben, betrachten Sie es bitte als gegenstandslos.${FUSS}`,
+    };
+  },
+  // Rechnung als QR-PDF (FileMaker "Rechnung Mail"); das PDF entsteht erst beim Versand aus dem festgeschriebenen Beleg.
+  async rechnung(pool, daten, an) {
+    const rechnung = await getRechnung(pool, daten.rechnungId);
+    const auftraggeber = await getAuftraggeberById(pool, rechnung.auftraggeberId);
+    const frist = Number((await pool.query('select zahlungsfrist_tage from rechnung where id=$1', [rechnung.id])).rows[0]?.zahlungsfrist_tage ?? 30);
+    const pdf = await erzeugeRechnungPdf(rechnung, await listPositionen(pool, rechnung.id), auftraggeber);
+    return {
+      an: an ?? auftraggeber.email ?? '', betreff: `Rechnung ${rechnung.nummer}`,
+      text: `Guten Tag\n\nIm Anhang erhalten Sie unsere Rechnung ${rechnung.nummer} vom ${datumCh(rechnung.datum)} über ${chf(rechnung.totalBrutto)}`
+        + `${rechnung.betreff ? ` (${rechnung.betreff})` : ''}. Bitte bezahlen Sie den Betrag innert ${frist} Tagen mit dem QR-Zahlteil.${FUSS}`,
+      anhaenge: [{ name: `Rechnung_${String(rechnung.nummer).replace(/[^\w.-]+/g, '_')}.pdf`, typ: 'application/pdf', inhalt: pdf }],
     };
   },
 };

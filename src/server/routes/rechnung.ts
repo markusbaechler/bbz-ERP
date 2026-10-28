@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type pg from 'pg';
 import { requireAdmin } from '../auth';
-import { createRechnung, addPosition, festschreiben, getRechnung, listPositionen, stornieren, setDefVereinbart, listRechnungen } from '../../repos/rechnungRepo';
+import { createRechnung, addPosition, festschreiben, getRechnung, listPositionen, stornieren, setDefVereinbart, listRechnungen, rechnungPerMail } from '../../repos/rechnungRepo';
 import { getAuftraggeberById } from '../../repos/auftraggeberRepo';
 import { erzeugeRechnungPdf } from '../../pdf/rechnungPdf';
 import { ValidationError, NotFoundError } from '../../domain/errors';
@@ -44,6 +44,11 @@ export function registerRechnungRoutes(app: FastifyInstance, pool: pg.Pool): voi
       const rechnung = await getRechnung(pool, id);
       return { ...rechnung, positionen: await listPositionen(pool, id) };
     } catch (e) { return mapErr(reply, e); }
+  });
+  // Rechnung mit QR-PDF per E-Mail (Outbox), Body { an?: string }
+  app.post('/rechnung/:id/mail', { preHandler: requireAdmin }, async (req, reply) => {
+    try { return reply.code(202).send(await rechnungPerMail(pool, (req.params as any).id, (req.body as any)?.an, req.benutzer)); }
+    catch (e) { return mapErr(reply, e); }
   });
   app.get('/rechnung/:id/pdf', async (req, reply) => {
     try {
