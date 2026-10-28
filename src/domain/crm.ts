@@ -54,6 +54,69 @@ export function phasenwechsel(von: Phase, nach: unknown, opts: {
   return { phase: nach, wahrscheinlichkeit: w, abgeschlossenAm: null, verlustgrund: null };
 }
 
+/* ---------- Eingabepruefung (gemeinsam fuer CRM-Repos) ---------- */
+
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Optionaler Text: undefined bleibt undefined (PATCH), null/leer -> null, sonst getrimmt. */
+export function optText(v: unknown, feld: string, max = 500): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (typeof v !== 'string') throw new ValidationError(`${feld} muss Text sein`);
+  const s = v.trim();
+  if (s.length > max) throw new ValidationError(`${feld} ist zu lang (max. ${max} Zeichen)`);
+  return s || null;
+}
+
+export function pflichtText(v: unknown, feld: string, max = 500): string {
+  const s = optText(v, feld, max);
+  if (!s) throw new ValidationError(`${feld} ist Pflicht`);
+  return s;
+}
+
+export function optEmail(v: unknown, feld = 'email'): string | null | undefined {
+  const s = optText(v, feld, 254);
+  if (!s) return s;
+  if (!EMAIL_RE.test(s)) throw new ValidationError(`Ungueltige E-Mail: ${s}`);
+  return s.toLowerCase();
+}
+
+export function optWert<T extends string>(v: unknown, feld: string, erlaubt: readonly T[]): T | null | undefined {
+  if (v === undefined || v === null) return v as null | undefined;
+  if (typeof v !== 'string' || !(erlaubt as readonly string[]).includes(v)) {
+    throw new ValidationError(`${feld}: ungueltiger Wert ${String(v)} (erlaubt: ${erlaubt.join(', ')})`);
+  }
+  return v as T;
+}
+
+export function optBool(v: unknown, feld: string): boolean | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v !== 'boolean') throw new ValidationError(`${feld} muss true oder false sein`);
+  return v;
+}
+
+export function optDatum(v: unknown, feld: string): string | null | undefined {
+  if (v === undefined || v === null) return v as null | undefined;
+  if (!istIsoDatum(v)) throw new ValidationError(`${feld} muss ein Datum YYYY-MM-DD sein`);
+  return v;
+}
+
+/** Zeitpunkt (ISO-8601 oder YYYY-MM-DD) fuer timestamptz-Felder. */
+export function optZeitpunkt(v: unknown, feld: string): string | null | undefined {
+  if (v === undefined || v === null) return v as null | undefined;
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(v) || Number.isNaN(Date.parse(v))) {
+    throw new ValidationError(`${feld} muss ein Zeitpunkt (ISO-8601) sein`);
+  }
+  return v;
+}
+
+/** Betrag in CHF (>= 0, max. 2 Nachkommastellen werden kaufmaennisch gerundet). */
+export function optBetrag(v: unknown, feld: string): number | null | undefined {
+  if (v === undefined || v === null) return v as null | undefined;
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v >= 1e10) throw new ValidationError(`${feld} muss ein Betrag >= 0 sein`);
+  return Math.round(v * 100) / 100;
+}
+
 /* ---------- Pipeline ---------- */
 
 export type PipelineChance = { phase: Phase; wertChf: number | null; wahrscheinlichkeit: number | null; erwarteterAbschluss: string | null };
