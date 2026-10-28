@@ -63,7 +63,7 @@ export async function ladeOrganisation360(pool: pg.Pool, id: string): Promise<Or
 
 export async function ladeKontakt360(db: pg.Pool, id: string): Promise<Kontakt360> {
   const kontakt = await getKontakt(db, id);
-  const [organisation, aktivitaeten, aufgaben, verkaufschancen, anmeldungen, lernnachweise, zertifizierungen] = await Promise.all([
+  const [organisation, aktivitaeten, aufgaben, verkaufschancen, anmeldungen, lernnachweise, zertifizierungen, saq] = await Promise.all([
     kontakt.organisationId ? getOrganisation(db, kontakt.organisationId) : Promise.resolve(null),
     listAktivitaeten(db, { kontaktId: id, limit: 50 }),
     db.query(`${AUFGABE_SELECT} where a.kontakt_id=$1
@@ -75,6 +75,7 @@ export async function ladeKontakt360(db: pg.Pool, id: string): Promise<Kontakt36
        where an.kontakt_id=$1 order by d.start_datum desc`, [id]),
     db.query('select * from lernnachweis where kontakt_id=$1 order by datum desc, erstellt_am desc', [id]),
     db.query('select * from zertifizierung where kontakt_id=$1 order by gueltig_bis desc', [id]),
+    db.query('select id, profil, variante, status, erstellt_am from saq_fall where kontakt_id=$1 order by erstellt_am desc', [id]),
   ]);
   return {
     ...kontakt, organisation, aktivitaeten, aufgaben: aufgaben.rows.map(mapAufgabe),
@@ -90,6 +91,7 @@ export async function ladeKontakt360(db: pg.Pool, id: string): Promise<Kontakt36
     zertifizierungen: zertifizierungen.rows.map((r: any): ZertifizierungKurz => ({
       id: r.id, typ: r.typ, zertifikatNr: r.zertifikat_nr, ausgestelltAm: r.ausgestellt_am, gueltigBis: r.gueltig_bis, status: r.status,
     })),
+    saqVorgaenge: saq.rows.map((r: any) => ({ id: r.id, profil: r.profil, variante: r.variante, status: r.status, erstelltAm: new Date(r.erstellt_am).toISOString() })),
   };
 }
 

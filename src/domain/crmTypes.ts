@@ -106,6 +106,8 @@ export type Kontakt360 = Kontakt & {
   anmeldungen: AnmeldungKurz[];
   lernnachweise: LernnachweisKurz[];
   zertifizierungen: ZertifizierungKurz[];
+  /** SAQ-Zertifizierungsvorgaenge (Profil, Status) – Kundenberatung sieht laufende Zertifizierungen */
+  saqVorgaenge: { id: string; profil: string; variante: string; status: string; erstelltAm: string }[];
 };
 
 export type CrmDashboard = {
