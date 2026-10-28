@@ -25,6 +25,8 @@ export type Durchfuehrung = {
   kapazitaet: number; minTeilnehmende: number; anmeldeschluss: string | null; preisChf: number | null;
   status: DurchfuehrungStatus; oeffentlich: boolean; auftraggeberId: string | null; moodleKursId: number | null; moodleSessionId: number | null;
   leitungId: string | null;
+  /** Seminarnummer des Moodle-Face-to-Face-Termins (Schluessel fuer den Moodle-Bericht und die FileMaker-"Seminar Nr.") */
+  seminarnummer: string | null;
 };
 
 export type Kurstag = {

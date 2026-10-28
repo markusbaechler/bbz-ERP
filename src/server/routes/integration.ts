@@ -8,7 +8,7 @@ import { listOutbox, wiederholen, publiziere } from '../../repos/outboxRepo';
 import { standardHandler, verarbeiteOutbox, type WorkerDeps } from '../../integrations/worker';
 import { MoodleFehler } from '../../integrations/moodle/client';
 import { abschlussSync } from '../../integrations/moodle/sync';
-import { importiereBuchungen, liesBuchungenCsv, type MoodleBuchung } from '../../integrations/moodle/buchungen';
+import { importiereBuchungen, importiereKursdatenBericht, liesBuchungenCsv, type MoodleBuchung } from '../../integrations/moodle/buchungen';
 import { pruefeSignatur, pruefeWebhookUrlSyntax } from '../../integrations/webhooks';
 import { markiereAbgeschlossen } from '../../repos/anmeldungRepo';
 import { findeDurchfuehrungPerMoodleSession, anmeldungenZuMoodleAbschluss } from '../../repos/zuordnungRepo';
@@ -100,6 +100,14 @@ export function registerIntegrationRoutes(app: FastifyInstance, pool: pg.Pool, d
       const buchungen = b.csv ? liesBuchungenCsv(b.csv) : b.buchungen ?? [];
       if (!buchungen.length) throw new ValidationError('Keine Buchungen (csv oder buchungen[])');
       return await importiereBuchungen(pool, durchfuehrungId, buchungen, req.benutzer);
+    } catch (e) { return sendError(reply, e); }
+  });
+  // Moodle-Bericht "Anmeldungen Kursdaten V2" (CSV, alle Termine) – Zuordnung ueber die Seminarnummer
+  app.post('/integration/moodle/kursdaten', { preHandler: requireAdmin }, async (req, reply) => {
+    try {
+      const csv = (req.body as any)?.csv;
+      if (typeof csv !== 'string' || !csv.trim()) throw new ValidationError('csv fehlt');
+      return await importiereKursdatenBericht(pool, csv, req.benutzer);
     } catch (e) { return sendError(reply, e); }
   });
 

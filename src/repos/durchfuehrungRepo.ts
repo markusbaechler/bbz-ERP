@@ -32,6 +32,7 @@ const mapD = (r: any): Durchfuehrung => ({
   kapazitaet: r.kapazitaet, minTeilnehmende: r.min_teilnehmende, anmeldeschluss: r.anmeldeschluss,
   preisChf: num(r.preis_chf), status: r.status, oeffentlich: r.oeffentlich, auftraggeberId: r.auftraggeber_id,
   moodleKursId: r.moodle_kurs_id, moodleSessionId: r.moodle_session_id ?? null, leitungId: r.leitung_id,
+  seminarnummer: r.seminarnummer ?? null,
 });
 
 const mapKurstag = (r: any): Kurstag => ({
@@ -47,6 +48,8 @@ export type DurchfuehrungInput = {
   preisChf?: number | null; oeffentlich?: boolean; auftraggeberId?: string | null; moodleKursId?: number | null;
   /** Moodle-Face-to-Face-Session (s=<ID>), fuer die Uebernahme der Moodle-Buchungen */
   moodleSessionId?: number | null;
+  /** Seminarnummer des Moodle-Termins (Schluessel fuer den Import des Berichts "Anmeldungen Kursdaten") */
+  seminarnummer?: string | null;
   leitungId?: string | null;
   /** Explizite Kurstage; fehlt die Liste, wird je Werktag zwischen Start und Ende ein Kurstag erzeugt ([] = keine). */
   kurstage?: KurstagInput[];
@@ -58,6 +61,7 @@ const COLS: Record<string, string> = {
   projektId: 'projekt_id', titel: 'titel', startDatum: 'start_datum', endDatum: 'end_datum', ort: 'ort',
   kapazitaet: 'kapazitaet', minTeilnehmende: 'min_teilnehmende', anmeldeschluss: 'anmeldeschluss', preisChf: 'preis_chf',
   oeffentlich: 'oeffentlich', auftraggeberId: 'auftraggeber_id', moodleKursId: 'moodle_kurs_id', moodleSessionId: 'moodle_session_id', leitungId: 'leitung_id',
+  seminarnummer: 'seminarnummer',
 };
 
 function pruefeFelder(p: DurchfuehrungPatch): void {
@@ -204,6 +208,7 @@ export async function createDurchfuehrung(db: Db, input: DurchfuehrungInput): Pr
        input.leitungId ?? null]);
     const id: string = r.rows[0].id;
     if (input.moodleSessionId != null) await c.query('update durchfuehrung set moodle_session_id=$2 where id=$1', [id, input.moodleSessionId]);
+    if (input.seminarnummer?.trim()) await c.query('update durchfuehrung set seminarnummer=$2 where id=$1', [id, input.seminarnummer.trim()]);
     for (const k of kurstage) await insertKurstag(c, id, k);
     return getDurchfuehrung(c, id);
   });

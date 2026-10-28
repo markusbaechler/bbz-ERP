@@ -32,6 +32,17 @@ export async function findeDurchfuehrungPerMoodleSession(db: Db, sessionId: numb
   return r.rowCount ? r.rows[0].id : null;
 }
 
+export async function findeDurchfuehrungPerSeminarnummer(db: Db, seminarnummer: string): Promise<string | null> {
+  const r = await db.query('select id from durchfuehrung where seminarnummer=$1', [seminarnummer.trim()]);
+  return r.rowCount ? r.rows[0].id : null;
+}
+
+/** Debitor (Auftraggeber) einer CRM-Organisation, z. B. die Bank als Rechnungsempfaenger. */
+export async function findeAuftraggeberPerOrganisation(db: Db, organisationId: string): Promise<string | null> {
+  const r = await db.query('select id from auftraggeber where organisation_id=$1 and aktiv', [organisationId]);
+  return r.rowCount ? r.rows[0].id : null;
+}
+
 /** Bereits uebernommene Buchung (Idempotenz-Schluessel der Anmeldung). */
 export async function findeAnmeldungPerIdempotenz(db: Db, schluessel: string): Promise<{ id: string; status: string } | null> {
   const r = await db.query('select id, status from anmeldung where idempotenz_schluessel=$1', [schluessel]);
