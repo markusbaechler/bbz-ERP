@@ -186,7 +186,9 @@ export async function createDurchfuehrung(db: Db, input: DurchfuehrungInput): Pr
     const a = await c.query('select code from kursangebot where id=$1 for no key update', [input.kursangebotId]);
     if (!a.rowCount) throw new NotFoundError(`Kursangebot ${input.kursangebotId} nicht gefunden`);
     const jahr = Number(input.startDatum.slice(0, 4));
-    const codes = await c.query('select code from durchfuehrung where kursangebot_id=$1', [input.kursangebotId]);
+    // Ueber alle Angebote suchen: ein frueher umbenanntes Angebot kann Codes mit demselben Praefix hinterlassen haben.
+    const praefix = `${a.rows[0].code}-${jahr}-`;
+    const codes = await c.query('select code from durchfuehrung where left(code, length($1)) = $1', [praefix]);
     const code = durchfuehrungsCode(a.rows[0].code, jahr,
       naechsteDurchfuehrungsNummer(codes.rows.map((x: any) => x.code), a.rows[0].code, jahr));
     const r = await c.query(

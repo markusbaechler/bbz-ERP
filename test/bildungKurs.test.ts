@@ -73,6 +73,13 @@ describe('durchfuehrung', () => {
     const d3 = await createDurchfuehrung(pool, { kursangebotId: a.id, startDatum: '2027-01-12', endDatum: '2027-01-12' });
     expect(d3.code).toBe('KBI-2027-1');
   });
+  it('Nummer beruecksichtigt auch Codes eines umbenannten Angebots mit gleichem Kuerzel', async () => {
+    const alt = await angebot(pool, { code: 'REN' });
+    await createDurchfuehrung(pool, { kursangebotId: alt.id, startDatum: '2026-11-02', endDatum: '2026-11-02' });
+    await updateKursangebot(pool, alt.id, { code: 'REN-ALT' });
+    const neu = await angebot(pool, { code: 'REN' });
+    expect((await createDurchfuehrung(pool, { kursangebotId: neu.id, startDatum: '2026-11-03', endDatum: '2026-11-03' })).code).toBe('REN-2026-2');
+  });
   it('vergibt Codes auch bei parallelen Anlagen eindeutig', async () => {
     const a = await angebot(pool, { code: 'PAR' });
     const ds = await Promise.all([1, 2, 3, 4].map(() =>
