@@ -12,7 +12,7 @@ export async function liste(ctx) {
   const q = ctx.query;
   const jahrHeute = Number(heute().slice(0, 4));
   const jahr = q.jahr === undefined ? String(jahrHeute) : q.jahr;
-  const status = q.status && q.status in STATUS_FILTER ? q.status : 'aktiv';
+  const status = Object.hasOwn(STATUS_FILTER, q.status ?? '') ? q.status : 'aktiv';
   const [portfolio, ma, ag] = await Promise.all([
     get('/projekt/portfolio', { jahr: jahr || undefined, status: STATUS_FILTER[status], projektleitungId: q.projektleitungId }),
     store.mitarbeitende(), store.auftraggeber(),

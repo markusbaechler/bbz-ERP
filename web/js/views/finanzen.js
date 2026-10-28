@@ -15,6 +15,8 @@ const finanzTabs = (aktiv) => tabs([
 const ZAHLUNGSFRIST = 30;
 const MWST = [['8.1', '8.1 %'], ['2.6', '2.6 %'], ['3.8', '3.8 %'], ['0', '0 %']];
 const STUFE = { 1: 'Erinnerung', 2: '2. Mahnung', 3: '3. Mahnung' };
+/** Route /rechnung/:id/mahnungen fehlt auf dem Server (Modul nicht ausgerollt): nicht bei jedem Rendern erneut anfragen. */
+let mahnungenFehlen = false;
 
 export async function rechnungen(ctx) {
   const q = ctx.query;
@@ -69,7 +71,7 @@ export async function rechnung(ctx) {
   const [ag, projekte, op, mahnungen] = await Promise.all([
     store.auftraggeber(), store.projekte(),
     ['abgerechnet', 'bezahlt'].includes(r.status) ? get('/debitoren/offene-posten', { auftraggeberId: r.auftraggeberId }) : Promise.resolve([]),
-    get(`/rechnung/${id}/mahnungen`, undefined, { ruhig: true }).catch(() => null),
+    mahnungenFehlen ? Promise.resolve(null) : get(`/rechnung/${id}/mahnungen`, undefined, { ruhig: true }).catch((e) => { if (istModulFehlt(e)) mahnungenFehlen = true; return null; }),
   ]);
   const a = ag.find((x) => x.id === r.auftraggeberId);
   const p = projekte.find((x) => x.id === r.projektId);

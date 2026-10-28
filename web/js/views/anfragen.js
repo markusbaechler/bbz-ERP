@@ -14,7 +14,7 @@ const FILTER = {
 };
 
 export async function anfragen(ctx) {
-  const ansicht = FILTER[ctx.query.status] ? ctx.query.status : 'offen';
+  const ansicht = Object.hasOwn(FILTER, ctx.query.status ?? '') ? ctx.query.status : 'offen';
   const [liste, offen] = await Promise.all([
     get('/anfrage', { status: FILTER[ansicht].status, limit: 200 }),
     ansicht === 'offen' ? Promise.resolve(null) : get('/anfrage', { status: FILTER.offen.status, limit: 200 }),
