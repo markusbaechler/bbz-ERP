@@ -36,7 +36,9 @@ export function tageZwischen(von: string, bis: string): number {
 
 /** Heutiges Datum in Europe/Zurich als YYYY-MM-DD. */
 export function heuteIso(jetzt: Date = new Date()): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit' }).format(jetzt);
+  const teile = new Intl.DateTimeFormat('de-CH', { timeZone: 'Europe/Zurich', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(jetzt);
+  const t = (typ: Intl.DateTimeFormatPartTypes) => teile.find((x) => x.type === typ)?.value ?? '';
+  return `${t('year')}-${t('month')}-${t('day')}`;
 }
 
 export function bewerteAmpel(p: { verbrauchChf: number; budgetChf: number | null; verzuege: { titel: string; tage: number }[] }): { ampel: Ampel; gruende: string[] } {
