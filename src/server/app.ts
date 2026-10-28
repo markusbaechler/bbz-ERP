@@ -7,6 +7,7 @@ import { registerRechnungRoutes } from './routes/rechnung';
 import { registerDebitorRoutes } from './routes/debitor';
 import { registerPersonalRoutes } from './routes/personal';
 import { registerSaqRoutes } from './routes/saq';
+import { registerMahnwesenRoutes } from './routes/mahnwesen';
 
 export function buildApp(pool: pg.Pool): FastifyInstance {
   const app = Fastify({ logger: false });
@@ -26,5 +27,6 @@ export function buildApp(pool: pg.Pool): FastifyInstance {
   registerDebitorRoutes(app, pool);
   registerPersonalRoutes(app, pool);
   registerSaqRoutes(app, pool);
+  registerMahnwesenRoutes(app, pool);
   return app;
 }
