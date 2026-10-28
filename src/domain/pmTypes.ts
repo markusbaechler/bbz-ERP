@@ -1,5 +1,6 @@
 // Typen des Projektmanagement-Moduls (Spec v2 §5.3). Der Projekt-Stamm selbst liegt in ./types.ts.
 import type { Projekt } from './types';
+import { ValidationError } from './errors';
 
 export type ProjektStatus = Projekt['status'];
 export const PROJEKT_STATUS: readonly ProjektStatus[] = ['akquise', 'offeriert', 'laufend', 'abgeschlossen', 'abgesagt', 'archiviert'];
@@ -81,3 +82,28 @@ export type Gantt = { projektId: string; start: string | null; ende: string | nu
 
 export type AuslastungTag = { datum: string; verplantTage: number };
 export type Auslastung = { referentId: string; anzeigename: string; tage: AuslastungTag[]; summeTage: number };
+
+// --- Validierungshilfen (DB-frei) ---
+
+const ISO_DATUM = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Gueltiges Kalenderdatum im Format YYYY-MM-DD? */
+export function istIsoDatum(v: unknown): v is string {
+  if (typeof v !== 'string' || !ISO_DATUM.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
+/** Prueft ein optionales (pflicht=false) bzw. zwingendes Datumsfeld; null/undefined ist optional erlaubt. */
+export function pruefeDatum(feld: string, v: unknown, pflicht = false): void {
+  if (v === null || v === undefined || v === '') {
+    if (pflicht) throw new ValidationError(`${feld} ist Pflicht`);
+    return;
+  }
+  if (!istIsoDatum(v)) throw new ValidationError(`${feld} muss ein Datum YYYY-MM-DD sein`);
+}
+
+/** Zeitraum gueltig: Ende nicht vor Start (fehlende Grenzen sind erlaubt). */
+export function pruefeZeitraum(start: string | null | undefined, ende: string | null | undefined, text = 'Zeitraum'): void {
+  if (start && ende && ende < start) throw new ValidationError(`${text} ungueltig: Ende ${ende} liegt vor Start ${start}`);
+}
