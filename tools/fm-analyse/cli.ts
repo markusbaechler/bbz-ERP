@@ -7,14 +7,17 @@
  * Aufruf DDR:      npm run fm:analyse -- <DDR-Ordner|Datei.xml> [--out <Ordner>] [--mit-konten]
  * Aufruf Data API: FM_PASSWORT=… npm run fm:analyse -- --data-api https://<server> --datenbank Projekte
  *                  [--datenbank Seminare] --benutzer <konto> [--api-version v1|vLatest] [--ohne-anzahl] [--out <Ordner>]
+ * Aufruf ohne Vollzugriff (Script-Ausdruck, siehe scriptDruck.ts):
+ *                  npm run fm:analyse -- --script-druck <Ordner mit .txt [+ dateien.json]> [--out <Ordner>]
  */
-import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { baueInventar, dekodiere } from './parser';
 import { analysiere, liesErpSchema } from './analyse';
 import { berichtMarkdown, mappingEntwurf } from './report';
 import { sammleUeberDataApi } from './dataApi';
+import { baueInventarAusScriptDruck } from './scriptDruck';
 import type { FmInventar } from './typen';
 import { istEinstieg } from '../../src/einstieg';
 
@@ -45,9 +48,21 @@ function schreibe(inv: FmInventar, argv: string[], quelle: string): { out: strin
 }
 
 /** Werte, die einem Schalter folgen, sind keine Eingabedatei. */
-const MIT_WERT = new Set(['--out', '--data-api', '--datenbank', '--benutzer', '--api-version']);
+const MIT_WERT = new Set(['--out', '--data-api', '--datenbank', '--benutzer', '--api-version', '--script-druck']);
+
+/** Ordner mit Script-Ausdrucken als Text (je FileMaker-Datei eine .txt) und optional dateien.json (Datensatzanzahl, gesperrte Scripts). */
+function fuehreAusScriptDruck(ordner: string, argv: string[]): { out: string; luecken: number } {
+  const txt = readdirSync(ordner).filter((f) => /\.txt$/i.test(f)).sort();
+  if (!txt.length) throw new Error(`${ordner}: keine Script-Ausdrucke (.txt). Je PDF zuerst: pdftotext -enc UTF-8 -layout <Datei>.pdf`);
+  const manifestPfad = join(ordner, 'dateien.json');
+  const manifest = existsSync(manifestPfad) ? JSON.parse(readFileSync(manifestPfad, 'utf8')) : {};
+  const inv = baueInventarAusScriptDruck(txt.map((f) => ({ name: f, inhalt: readFileSync(join(ordner, f), 'utf8') })), manifest);
+  return schreibe(inv, argv, `Script-Ausdruck ${basename(resolve(ordner))}`);
+}
 
 export function fuehreAus(argv: string[]): { out: string; luecken: number } {
+  const scriptDruck = wert(argv, '--script-druck');
+  if (scriptDruck) return fuehreAusScriptDruck(resolve(scriptDruck), argv);
   const eingabe = argv.find((a, i) => !a.startsWith('--') && !MIT_WERT.has(argv[i - 1]));
   if (!eingabe) throw new Error('Aufruf: fm-analyse <DDR-Ordner|Datei.xml> [--out <Ordner>] [--mit-konten]');
   const dateien = xmlDateien(resolve(eingabe)).map((p) => ({ name: basename(p), inhalt: dekodiere(readFileSync(p)) }));

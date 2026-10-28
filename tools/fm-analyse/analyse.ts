@@ -4,13 +4,17 @@ import type { FmInventar, FmScript, FmTabelle } from './typen';
 
 export type Funktion =
   | 'Import' | 'Export' | 'PDF' | 'Druck' | 'E-Mail' | 'Web/URL' | 'Server' | 'Datenpflege' | 'Suche'
-  | 'Navigation' | 'Dialog' | 'Dateien' | 'Externe Programme';
+  | 'Navigation' | 'Dialog' | 'Dateien' | 'Externe Programme' | 'Konten' | 'Telefonie';
 
 /*
  * Zuordnung ueber Schritt-ID (sprachunabhaengig) und – als Rueckfall – ueber den Namen (DE/EN).
  * Die IDs entsprechen den FileMaker-Script-Step-IDs im XML; Abweichungen je Version faengt die Namensregel auf.
  */
 const SCHRITT_REGELN: { funktion: Funktion; ids: number[]; name: RegExp }[] = [
+  // vor "Datenpflege" (Konto loeschen) und "Dateien" (Plug-In-Datei)
+  { funktion: 'Konten', ids: [], name: /konto|account|passwort|password|erneut anmelden|re-?login/i },
+  { funktion: 'Telefonie', ids: [], name: /telefonnummer|dial phone/i },
+  { funktion: 'Externe Programme', ids: [], name: /plug-?in/i },
   { funktion: 'Import', ids: [35], name: /import/i },
   { funktion: 'Export', ids: [36], name: /export|als excel|save records as (excel|snapshot)/i },
   { funktion: 'PDF', ids: [144], name: /pdf/i },
@@ -20,7 +24,8 @@ const SCHRITT_REGELN: { funktion: Funktion; ids: number[]; name: RegExp }[] = [
   { funktion: 'Server', ids: [164], name: /auf server|on server/i },
   { funktion: 'Datenpflege', ids: [76, 7, 8, 9, 10, 91, 92, 93], name: /feldwert setzen|set field|neuer datensatz|new record|duplizier|duplicate|l[oö]sch|delete|ersetze|replace field/i },
   { funktion: 'Suche', ids: [28, 31, 22, 25], name: /suche|find|abfrage|show all|alle datens[aä]tze/i },
-  { funktion: 'Navigation', ids: [6, 16, 74], name: /gehe zu|go to/i },
+  // "Datei öffnen" oeffnet in FileMaker eine andere Datei der Loesung = Wechsel des Bereichs
+  { funktion: 'Navigation', ids: [6, 16, 74], name: /gehe zu|go to|datei öffnen|datei schlie|open file|close file/i },
   { funktion: 'Dialog', ids: [87], name: /dialog|eigenes dialogfeld|custom dialog/i },
   { funktion: 'Dateien', ids: [], name: /datei|file|container|exportiere feldinhalt|export field contents/i },
   { funktion: 'Externe Programme', ids: [], name: /applescript|ereignis senden|send event|dde|odbc|sql/i },
@@ -52,26 +57,32 @@ export type ModulRegel = { modul: ErpModul; muster: RegExp; zielTabelle?: string
  * kurze Woerter nur mit Wortgrenze (^|_)…(_|$), sonst trifft z. B. "vat" auch "Raumreser-vat-ion".
  */
 export const MODUL_REGELN: ModulRegel[] = [
-  { modul: 'Finanzen', muster: /zahlung|debitor|op_?liste|offene_?posten/, zielTabelle: 'zahlungseingang' },
-  { modul: 'Finanzen', muster: /position|rechnungszeile|fakturazeile/, zielTabelle: 'rechnungsposition' },
+  // (v)esr: Debitoren und Zahlungseingang der bbz-Loesung
+  { modul: 'Finanzen', muster: /zahlung|debitor|op_?liste|offene_?posten|(^|_)v?esr(_|$)/, zielTabelle: 'zahlungseingang' },
+  { modul: 'Finanzen', muster: /position|rechnungszeile|fakturazeile|(^|_)pos_fak/, zielTabelle: 'rechnungsposition' },
   { modul: 'Finanzen', muster: /rechnung|faktur|invoice|(^|_)qr(_|$)/, zielTabelle: 'rechnung' },
   { modul: 'Stammdaten', muster: /mwst|mehrwertsteuer|steuersatz|(^|_)vat(_|$)/, zielTabelle: 'mwst_satz' },
-  { modul: 'Stammdaten', muster: /konto|kontenplan|kontierung/, zielTabelle: 'konto' },
-  { modul: 'Bildung', muster: /anmeldung|registration|buchung/, zielTabelle: 'anmeldung' },
+  { modul: 'Stammdaten', muster: /konto|konti|kontenplan|kontierung/, zielTabelle: 'konto' },
+  { modul: 'Bildung', muster: /anmeldung|registration|buchung|belegung/, zielTabelle: 'anmeldung' },
   { modul: 'Bildung', muster: /teilnehm|participant/, zielTabelle: 'anmeldung' },
   { modul: 'Bildung', muster: /kurstag|seminartag|termin/, zielTabelle: 'kurstag' },
+  { modul: 'Bildung', muster: /kurs_?typ|kursangebot/, zielTabelle: 'kursangebot' },
   { modul: 'Bildung', muster: /durchf|seminar|kurs|lehrgang|modul|ausbildung/, zielTabelle: 'durchfuehrung' },
   { modul: 'Bildung', muster: /zertifi|saq|pruefung|lernstunde/, zielTabelle: 'zertifizierung' },
   { modul: 'Personal/Ressourcen', muster: /referent|trainer|dozent|coach/, zielTabelle: 'referent' },
+  // Projektschritte (Datum, Referent, Ort, abgerechnet) und Wochenplan sind Einsaetze
+  { modul: 'Personal/Ressourcen', muster: /wochenplan|einsatz|(^|_)schritte(_|$)/, zielTabelle: 'einsatz' },
   { modul: 'Personal/Ressourcen', muster: /mitarbeit|personal|benutzer|(^|_)users?(_|$)|login|kuerzel/, zielTabelle: 'mitarbeitende' },
   { modul: 'Projekte/PM', muster: /zeit|rapport|stunden|aufwand|leistung/, zielTabelle: 'zeiterfassung' },
   { modul: 'Projekte/PM', muster: /aufgabe|task|pendenz|todo/, zielTabelle: 'aufgabe' },
   { modul: 'Finanzen', muster: /auftraggeber|debitor|kunde|(^|_)bank(en)?(_|$)/, zielTabelle: 'auftraggeber' },
   { modul: 'Projekte/PM', muster: /projekt|project|auftrag/, zielTabelle: 'projekt' },
-  { modul: 'CRM', muster: /kontakt|person|adress|firma|firmen|organisation|ansprech/, zielTabelle: 'kontakt' },
-  { modul: 'CRM', muster: /aktivit|history|historie|notiz|besuch|telefon/, zielTabelle: 'aktivitaet' },
-  { modul: 'CRM', muster: /serienbrief|mailing|newsletter|brief|korrespondenz/ },
-  { modul: 'System', muster: /global|einstellung|setting|preference|(^|_)menue?(_|$)|navigation|dashboard|(^|_)start(_|$)|hilfe|(^|_)log(_|$)|logbuch|zaehler|counter|(^|_)temp(_|$)/ },
+  { modul: 'CRM', muster: /adress|firma|firmen|organisation|filiale|niederlass/, zielTabelle: 'organisation' },
+  { modul: 'CRM', muster: /kontakt|person|ansprech|kommunik/, zielTabelle: 'kontakt' },
+  { modul: 'CRM', muster: /aktivit|history|historie|notiz|besuch|telefon|korresp|(^|_)story(_|$)/, zielTabelle: 'aktivitaet' },
+  { modul: 'CRM', muster: /serienbrief|mailing|newsletter|brief|vermerk|adr_?typ/ },
+  { modul: 'Stammdaten', muster: /(^|_)plz(_|$)|postleitzahl/ },
+  { modul: 'System', muster: /global|einstellung|setting|preference|(^|_)menue?(_|$)|navigation|dashboard|(^|_)start(_|$)|hilfe|(^|_)log(_|$)|logbuch|zaehler|counter|(^|_)temp(_|$)|(^|_)standards?(_|$)/ },
 ];
 
 /** Kleinbuchstaben, Umlaute ausgeschrieben, nur [a-z0-9_]. */
@@ -189,6 +200,8 @@ export const ERP_ABDECKUNG: Record<Funktion, string | null> = {
   Dialog: 'PWA-Dialoge/Validierungsmeldungen',
   Dateien: null,
   'Externe Programme': null,
+  Konten: 'Entra ID (Konten und Rollen zentral, keine Konten in der Anwendung)',
+  Telefonie: 'tel:-Links in der PWA (web/js/ui.js, sichereUrl)',
 };
 
 export function analysiere(inv: FmInventar, erpSchema: Map<string, string[]>): Analyse {

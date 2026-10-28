@@ -14,6 +14,11 @@ export function berichtMarkdown(inv: FmInventar, a: Analyse, opts: { mitKonten?:
     z.push('> **Quelle Data API:** Tabellen sind Tabellenvorkommen und nur sichtbar, soweit sie auf einem Layout liegen. Script-Schritte, Formeln,',
       '> Beziehungsschluessel und Konten liefert nur der Designreport (DDR). Datensatzinhalte wurden nicht uebernommen.', '');
   }
+  if (inv.format === 'ScriptDruck') {
+    z.push('> **Quelle Script-Ausdruck (ohne Vollzugriff):** Scripts und Schritte wie im DDR, soweit das Konto sie ansehen darf. Je Datei',
+      '> eine Tabelle mit dem Namen der Datei [Hypothese]; Felder nur, soweit Scripts sie nennen. Formeln, Beziehungen, Wertelisten',
+      '> und Konten fehlen; dafuer braucht es den DDR mit [Vollzugriff]. Kommentare und Kontonamen wurden nicht uebernommen.', '');
+  }
   z.push('## 1. Kennzahlen', '');
   z.push('| Dateien | Tabellen | Felder | davon berechnet | Datensaetze | Tabellenvorkommen | Beziehungen | Layouts | Scripts | Script-Schritte | Wertelisten | Eigene Funktionen | Konten |');
   z.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
@@ -22,7 +27,8 @@ export function berichtMarkdown(inv: FmInventar, a: Analyse, opts: { mitKonten?:
   z.push('## 2. Dateien und Querverweise', '');
   for (const d of inv.dateien) {
     const refs = d.dateiReferenzen.map((r) => r.name).join(', ') || '–';
-    z.push(`- **${esc(d.name)}**: ${d.tabellen.length} Tabellen, ${d.layouts.length} Layouts, ${d.scripts.length} Scripts; Dateiverweise: ${esc(refs)}; Berechtigungssaetze: ${esc(d.berechtigungssaetze.join(', ') || '–')}`);
+    const gesperrt = d.gesperrteScripts ? ` (+ ${d.gesperrteScripts} Scripts ohne Leserecht)` : '';
+    z.push(`- **${esc(d.name)}**: ${d.tabellen.length} Tabellen, ${d.layouts.length} Layouts, ${d.scripts.length} Scripts${gesperrt}; Dateiverweise: ${esc(refs)}; Berechtigungssaetze: ${esc(d.berechtigungssaetze.join(', ') || '–')}`);
   }
   z.push('');
 
