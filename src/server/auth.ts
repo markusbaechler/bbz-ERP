@@ -1,7 +1,11 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 declare module 'fastify' {
-  interface FastifyRequest { rolle: 'admin' | 'standard'; }
+  interface FastifyRequest {
+    rolle: 'admin' | 'standard';
+    /** Kuerzel der angemeldeten Person (z. B. "ml"); null = unbekannt */
+    benutzer: string | null;
+  }
 }
 
 export async function requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void> {

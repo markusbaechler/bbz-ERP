@@ -40,3 +40,36 @@ export type OffenerPosten = {
   rechnungId: string; nummer: string | null; auftraggeberId: string; datum: string;
   totalBrutto: number; bezahlt: number; offen: number;
 };
+
+export type Rolle = 'admin' | 'standard';
+
+export type Mitarbeitende = {
+  id: string; kuerzel: string; vorname: string | null; nachname: string; email: string | null;
+  rolle: Rolle; entraOid: string | null; stundensatzIntern: number | null; stundensatzVerrechnung: number | null;
+  aktiv: boolean;
+};
+
+export type Referent = {
+  id: string; typ: 'intern' | 'extern'; mitarbeitendeId: string | null; kontaktId: string | null;
+  anzeigename: string; fachgebiete: string[]; tagessatzChf: number | null; halbtagessatzChf: number | null;
+  aktiv: boolean; bemerkung: string | null;
+};
+
+export type Interesse = 'nachwuchs' | 'tailormade' | 'weiterbildung' | 'zertifizierung' | 'beratung';
+
+export type Kontakt = {
+  id: string; organisationId: string | null; anrede: 'Frau' | 'Herr' | 'Divers' | null; titel: string | null;
+  vorname: string | null; nachname: string; funktion: string | null; abteilung: string | null;
+  email: string | null; email2: string | null; telefon: string | null; mobile: string | null;
+  sprache: string; geburtsdatum: string | null; rolle: string | null; zielgruppe: string | null;
+  betreuerId: string | null; interessen: Interesse[]; prioritaet: 'hoch' | 'mittel' | 'tief' | null;
+  newsletter: boolean; einwilligungAm: string | null; einwilligungQuelle: string | null;
+  moodleUserId: number | null; bemerkung: string | null; archiviert: boolean;
+};
+
+export type EinsatzStatus = 'angefragt' | 'bestaetigt' | 'abgesagt' | 'durchgefuehrt';
+
+export type Einsatz = {
+  id: string; referentId: string; projektId: string; kurstagId: string | null; datum: string;
+  dauerTage: number; rolle: string; honorarChf: number | null; status: EinsatzStatus; bemerkung: string | null;
+};
