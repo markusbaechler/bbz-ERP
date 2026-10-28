@@ -59,6 +59,8 @@ describe('Entra-ID-Auth', () => {
   });
   it('liest die Konfiguration aus der Umgebung', () => {
     expect(authKonfigAusEnv({}).modus).toBe('dev');
+    expect(() => authKonfigAusEnv({ NODE_ENV: 'production' })).toThrow(/in Produktion gesperrt/);
+    expect(authKonfigAusEnv({ NODE_ENV: 'production', ERLAUBE_DEV_AUTH: 'true' }).modus).toBe('dev');
     expect(() => authKonfigAusEnv({ AUTH_MODE: 'entra' })).toThrow(/ENTRA_TENANT_ID/);
     expect(authKonfigAusEnv({ AUTH_MODE: 'entra', ENTRA_TENANT_ID: 't', ENTRA_AUDIENCE: 'a' })).toMatchObject({ modus: 'entra', adminRolle: 'bbz.admin' });
   });

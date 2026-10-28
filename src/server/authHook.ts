@@ -17,7 +17,13 @@ export type AuthKonfig =
   | { modus: 'entra'; tenantId: string; audience: string; adminRolle?: string; jwks?: JWTVerifyGetKey; issuer?: string };
 
 export function authKonfigAusEnv(env: NodeJS.ProcessEnv = process.env): AuthKonfig {
-  if ((env.AUTH_MODE ?? 'dev') !== 'entra') return { modus: 'dev' };
+  if ((env.AUTH_MODE ?? 'dev') !== 'entra') {
+    // Dev-Auth vertraut Headern -> in Produktion nur mit ausdruecklicher Freigabe (z. B. Demo-Instanz)
+    if (env.NODE_ENV === 'production' && env.ERLAUBE_DEV_AUTH !== 'true') {
+      throw new Error('AUTH_MODE=dev ist in Produktion gesperrt: AUTH_MODE=entra setzen (oder ERLAUBE_DEV_AUTH=true fuer eine Demo)');
+    }
+    return { modus: 'dev' };
+  }
   if (!env.ENTRA_TENANT_ID || !env.ENTRA_AUDIENCE) throw new Error('AUTH_MODE=entra verlangt ENTRA_TENANT_ID und ENTRA_AUDIENCE');
   return { modus: 'entra', tenantId: env.ENTRA_TENANT_ID, audience: env.ENTRA_AUDIENCE, adminRolle: env.ENTRA_ADMIN_ROLE ?? 'bbz.admin' };
 }
