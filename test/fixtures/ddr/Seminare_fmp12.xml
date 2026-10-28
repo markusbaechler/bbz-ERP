@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETISCHE Test-Fixture (kein echter bbz-Export). -->
+<FMPReport link="Summary.xml" type="Report" version="18.0.3">
+  <File name="Seminare">
+    <BaseTableCatalog>
+      <BaseTable id="1" name="Seminare" records="380">
+        <FieldCatalog>
+          <Field id="1" name="Titel" dataType="Text" fieldType="Normal"/>
+          <Field id="2" name="Datum von" dataType="Date" fieldType="Normal"/>
+          <Field id="3" name="Kapazitaet" dataType="Number" fieldType="Normal"/>
+          <Field id="4" name="Kursort" dataType="Text" fieldType="Normal"/>
+        </FieldCatalog>
+      </BaseTable>
+      <BaseTable id="2" name="Teilnehmer" records="9120">
+        <FieldCatalog>
+          <Field id="1" name="Vorname" dataType="Text" fieldType="Normal"/>
+          <Field id="2" name="Nachname" dataType="Text" fieldType="Normal"/>
+          <Field id="3" name="Mail" dataType="Text" fieldType="Normal"/>
+        </FieldCatalog>
+      </BaseTable>
+      <BaseTable id="3" name="Raumreservation" records="55"><FieldCatalog><Field id="1" name="Raum" dataType="Text" fieldType="Normal"/></FieldCatalog></BaseTable>
+    </BaseTableCatalog>
+    <ScriptCatalog>
+      <Script id="1" name="Anmeldungen aus Excel importieren"><StepList><Step enable="True" id="35" name="Datensätze importieren"/></StepList></Script>
+      <Script id="2" name="Serienbrief Teilnehmer"><StepList><Step enable="True" id="63" name="E-Mail senden"/><Step enable="True" id="99" name="AppleScript ausführen"/></StepList></Script>
+    </ScriptCatalog>
+  </File>
+</FMPReport>

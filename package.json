@@ -9,10 +9,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate": "tsx src/db/migrate.ts",
-    "dev": "tsx watch src/server/main.ts"
+    "dev": "tsx watch src/server/main.ts",
+    "fm:analyse": "tsx tools/fm-analyse/cli.ts"
   },
   "dependencies": {
     "@types/pdfkit": "^0.17.6",
+    "fast-xml-parser": "^4.5.0",
     "fastify": "^4.28.1",
     "pdfkit": "^0.19.1",
     "pg": "^8.12.0",

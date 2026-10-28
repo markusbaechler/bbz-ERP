@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETISCHE Test-Fixture (kein echter bbz-Export). Struktur nach FileMaker-DDR (FMPReport). -->
+<FMPReport link="Summary.xml" type="Report" version="18.0.3">
+  <File name="Projekte" path="fmnet:/BBZ-AZ-SRVAPP01/Projekte">
+    <BaseTableCatalog>
+      <BaseTable id="130" name="Projekte" records="4967">
+        <FieldCatalog>
+          <Field id="1" name="ProjektNr" dataType="Text" fieldType="Normal">
+            <Validation type="OnlyDuringDataEntry" allowOverride="False" notEmpty="True" unique="True"/>
+            <Storage autoIndex="True" index="All" global="False" maxRepetition="1"/>
+          </Field>
+          <Field id="2" name="Stammnummer" dataType="Number" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="3" name="Jahr" dataType="Number" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="4" name="Projektname" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="5" name="Bereich" dataType="Text" fieldType="Normal">
+            <Validation notEmpty="False"><ValueList id="1" name="Bereiche"/></Validation><Storage global="False" maxRepetition="1"/>
+          </Field>
+          <Field id="6" name="Budget" dataType="Number" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="7" name="Total abgerechnet" dataType="Number" fieldType="Calculated">
+            <Calculation table="Projekte"><![CDATA[Sum ( Fakturen::Total netto )]]></Calculation>
+          </Field>
+          <Field id="8" name="Erstellt am" dataType="Timestamp" fieldType="Normal">
+            <AutoEnter allowEditing="False" value="CreationTimestamp"/><Storage global="False" maxRepetition="1"/>
+          </Field>
+          <Field id="9" name="gSuche" dataType="Text" fieldType="Normal"><Storage global="True" maxRepetition="1"/></Field>
+          <Field id="10" name="AuftraggeberNr" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="11" name="Anzahl Projekte" dataType="Number" fieldType="Summary">
+            <SummaryInfo operation="Count"><SummaryField><Field id="1" name="ProjektNr"/></SummaryField></SummaryInfo>
+          </Field>
+        </FieldCatalog>
+      </BaseTable>
+      <BaseTable id="131" name="Auftraggeber" records="412">
+        <FieldCatalog>
+          <Field id="1" name="Nummer" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="2" name="Name" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="3" name="Strasse" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="4" name="PLZ" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="5" name="Ort" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="6" name="E-Mail" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+        </FieldCatalog>
+      </BaseTable>
+      <BaseTable id="132" name="Fakturen" records="15230">
+        <FieldCatalog>
+          <Field id="1" name="RgNr" dataType="Number" fieldType="Normal">
+            <AutoEnter allowEditing="False" value="SerialNumber"><Serial generate="OnCommit" nextValue="33215" increment="1"/></AutoEnter>
+            <Storage global="False" maxRepetition="1"/>
+          </Field>
+          <Field id="2" name="ProjektNr" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="3" name="Datum" dataType="Date" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="4" name="Total netto" dataType="Number" fieldType="Calculated"><Calculation><![CDATA[Sum ( Positionen::Betrag )]]></Calculation></Field>
+          <Field id="5" name="Status" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="6" name="QR Referenz" dataType="Text" fieldType="Calculated"><Calculation><![CDATA[QRRef ( RgNr )]]></Calculation></Field>
+        </FieldCatalog>
+      </BaseTable>
+      <BaseTable id="133" name="Positionen" records="40122">
+        <FieldCatalog>
+          <Field id="1" name="RgNr" dataType="Number" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="2" name="Text" dataType="Text" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="3" name="Menge" dataType="Number" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="4" name="Preis" dataType="Number" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="5" name="MWSt" dataType="Number" fieldType="Normal"><Storage global="False" maxRepetition="1"/></Field>
+          <Field id="6" name="Betrag" dataType="Number" fieldType="Calculated"><Calculation><![CDATA[Menge * Preis]]></Calculation></Field>
+        </FieldCatalog>
+      </BaseTable>
+      <BaseTable id="134" name="Globals" records="1">
+        <FieldCatalog>
+          <Field id="1" name="gFirma" dataType="Text" fieldType="Normal"><Storage global="True" maxRepetition="1"/></Field>
+        </FieldCatalog>
+      </BaseTable>
+    </BaseTableCatalog>
+    <RelationshipGraph>
+      <TableList>
+        <Table id="1" name="Projekte" baseTable="Projekte" baseTableId="130"/>
+        <Table id="2" name="Auftraggeber" baseTable="Auftraggeber" baseTableId="131"/>
+        <Table id="3" name="Fakturen" baseTable="Fakturen" baseTableId="132"/>
+        <Table id="4" name="Positionen" baseTable="Positionen" baseTableId="133"/>
+        <Table id="5" name="Seminare_Projekt" baseTable="Seminare" fileReference="Seminare"/>
+      </TableList>
+      <RelationshipList>
+        <Relationship id="1">
+          <LeftTable cascadeCreate="False" cascadeDelete="False" name="Projekte"/>
+          <RightTable cascadeCreate="True" cascadeDelete="False" name="Fakturen"/>
+          <JoinPredicateList><JoinPredicate type="Equal">
+            <LeftField><Field table="Projekte" id="1" name="ProjektNr"/></LeftField>
+            <RightField><Field table="Fakturen" id="2" name="ProjektNr"/></RightField>
+          </JoinPredicate></JoinPredicateList>
+        </Relationship>
+        <Relationship id="2">
+          <LeftTable cascadeCreate="False" cascadeDelete="False" name="Fakturen"/>
+          <RightTable cascadeCreate="True" cascadeDelete="True" name="Positionen"/>
+          <JoinPredicateList><JoinPredicate type="Equal">
+            <LeftField><Field table="Fakturen" id="1" name="RgNr"/></LeftField>
+            <RightField><Field table="Positionen" id="1" name="RgNr"/></RightField>
+          </JoinPredicate></JoinPredicateList>
+        </Relationship>
+        <Relationship id="3">
+          <LeftTable cascadeCreate="False" cascadeDelete="False" name="Projekte"/>
+          <RightTable cascadeCreate="False" cascadeDelete="False" name="Auftraggeber"/>
+          <JoinPredicateList><JoinPredicate type="Equal">
+            <LeftField><Field table="Projekte" id="10" name="AuftraggeberNr"/></LeftField>
+            <RightField><Field table="Auftraggeber" id="1" name="Nummer"/></RightField>
+          </JoinPredicate></JoinPredicateList>
+        </Relationship>
+      </RelationshipList>
+    </RelationshipGraph>
+    <LayoutCatalog>
+      <Group name="Projekte">
+        <Layout id="1" name="Projekt Detail"><Table id="1" name="Projekte"/>
+          <Object type="Field"><FieldObj name="Projekte::ProjektNr"><Name>Projekte::ProjektNr</Name></FieldObj></Object>
+          <Object type="Field"><FieldObj name="Projekte::Projektname"><Name>Projekte::Projektname</Name></FieldObj></Object>
+          <Object type="Button"><ButtonObj><Step id="1" name="Script ausführen"><Script id="1" name="Rechnung erstellen"/></Step></ButtonObj></Object>
+        </Layout>
+        <Layout id="2" name="Projekt Liste"><Table id="1" name="Projekte"/></Layout>
+      </Group>
+      <Group name="Faktura">
+        <Layout id="3" name="Rechnung Druck"><Table id="3" name="Fakturen"/></Layout>
+        <Layout id="4" name="OP-Liste"><Table id="3" name="Fakturen"/></Layout>
+      </Group>
+    </LayoutCatalog>
+    <ScriptCatalog>
+      <Group name="Faktura">
+        <Script id="1" name="Rechnung erstellen" includeInMenu="True">
+          <StepList>
+            <Step enable="True" id="89" name="# (Kommentar)"><Text>Neue Rechnung zum aktuellen Projekt</Text></Step>
+            <Step enable="True" id="141" name="Variable setzen"><Name>$projekt</Name><Value><Calculation><![CDATA[Projekte::ProjektNr]]></Calculation></Value></Step>
+            <Step enable="True" id="6" name="Gehe zu Layout"><Layout id="3" name="Rechnung Druck"/></Step>
+            <Step enable="True" id="7" name="Neuer Datensatz/Abfrage"/>
+            <Step enable="True" id="76" name="Feldwert setzen"><Field table="Fakturen" id="2" name="ProjektNr"/><Calculation><![CDATA[$projekt]]></Calculation></Step>
+          </StepList>
+        </Script>
+        <Script id="2" name="QR-Rechnung als PDF">
+          <StepList>
+            <Step enable="True" id="144" name="Datensätze als PDF speichern"/>
+            <Step enable="True" id="63" name="E-Mail senden"/>
+          </StepList>
+        </Script>
+        <Script id="3" name="OP-Liste drucken"><StepList><Step enable="True" id="43" name="Drucken"/></StepList></Script>
+      </Group>
+      <Group name="Admin">
+        <Script id="4" name="Jahreswechsel Projekte">
+          <StepList>
+            <Step enable="True" id="28" name="Ergebnismenge suchen"/>
+            <Step enable="True" id="36" name="Datensätze exportieren"/>
+            <Step enable="False" id="35" name="Datensätze importieren"/>
+          </StepList>
+        </Script>
+        <Script id="5" name="Kursdaten nachladen">
+          <StepList><Step enable="True" id="160" name="Aus URL einfügen"><Calculation><![CDATA["https://example.invalid/kurse"]]></Calculation></Step></StepList>
+        </Script>
+      </Group>
+    </ScriptCatalog>
+    <ValueListCatalog>
+      <ValueList id="1" name="Bereiche"><Source value="Custom"/><CustomValues><Text>Banking&#13;Kundenberaterausbildung&#13;Leadership&#13;Beratung</Text></CustomValues></ValueList>
+      <ValueList id="2" name="Auftraggeber"><Source value="Field"/><PrimaryField><Field table="Auftraggeber" id="2" name="Name"/></PrimaryField></ValueList>
+    </ValueListCatalog>
+    <CustomFunctionCatalog>
+      <CustomFunction id="1" name="QRRef" parameters="nr" visible="True"><Calculation><![CDATA["7610400" & Right ( "0000000000000000000" & nr ; 19 )]]></Calculation></CustomFunction>
+    </CustomFunctionCatalog>
+    <AccountCatalog>
+      <Account id="1" name="Admin" privilegeSet="[Full Access]" status="Active" type="FileMaker"/>
+      <Account id="2" name="Max Muster" privilegeSet="Standard" status="Active" type="FileMaker"/>
+      <Account id="3" name="Alt" privilegeSet="Standard" status="Inactive" type="FileMaker"/>
+    </AccountCatalog>
+    <PrivilegesCatalog><PrivilegeSet id="1" name="[Full Access]"/><PrivilegeSet id="2" name="Standard"/></PrivilegesCatalog>
+    <ExtendedPrivilegeCatalog><ExtendedPrivilege name="fmapp"/></ExtendedPrivilegeCatalog>
+    <FileReferenceCatalog><FileReference id="1" name="Seminare" pathList="file:Seminare"/></FileReferenceCatalog>
+  </File>
+</FMPReport>

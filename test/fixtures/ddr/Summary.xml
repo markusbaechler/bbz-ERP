@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETISCHE Test-Fixture (kein echter bbz-Export). Struktur nach FileMaker-DDR (FMPReport). -->
+<FMPReport link="Summary.xml" type="Summary" version="18.0.3" creationTime="10:00:00" creationDate="28.10.2026">
+  <File name="Projekte" link="Projekte_fmp12.xml" path="fmnet:/BBZ-AZ-SRVAPP01/Projekte">
+    <BaseTables count="5"/><Tables count="6"/><Relationships count="4"/><Layouts count="4"/><Scripts count="5"/>
+  </File>
+  <File name="Seminare" link="Seminare_fmp12.xml" path="fmnet:/BBZ-AZ-SRVAPP01/Seminare"/>
+</FMPReport>
