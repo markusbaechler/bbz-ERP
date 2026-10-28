@@ -31,6 +31,7 @@ describe('fm-analyse: Parser (DDR)', () => {
     expect(p.felder.find((f) => f.name === 'Anzahl Projekte')!.formel).toBe('Count(ProjektNr)');
     const rg = projekte.tabellen.find((t) => t.name === 'Fakturen')!.felder.find((f) => f.name === 'RgNr')!;
     expect(rg.autoEingabe).toContain('Seriennummer');
+    expect(rg.naechsterSerienwert).toBe(33215);
   });
   it('liest Beziehungen inkl. Kaskaden und externe Tabellenvorkommen', () => {
     const b = projekte.beziehungen.find((x) => x.rechts === 'Positionen')!;
@@ -133,6 +134,7 @@ describe('fm-analyse: Bericht + CLI', () => {
     const md = berichtMarkdown(inv, a);
     expect(md).toContain('## 5. Funktionsumfang aus Scripts');
     expect(md).toContain('| Projekte | Fakturen | 15230 |');
+    expect(md).toContain('Projekte::Fakturen::RgNr – naechster Wert **33215**');
     expect(md).not.toContain('Max Muster');
     expect(berichtMarkdown(inv, a, { mitKonten: true })).toContain('Max Muster');
     expect(mappingEntwurf(a)['Projekte::Auftraggeber'].felder).toMatchObject({ Name: 'name', PLZ: 'plz', 'E-Mail': 'email' });

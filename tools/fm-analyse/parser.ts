@@ -115,6 +115,7 @@ function ddrFeld(f: Knoten): FmFeld {
     art: attr(f, 'fieldType') ?? 'Normal', formel: formel || null, autoEingabe, validierung,
     global: istWahr(attr(storage, 'global')), wiederholungen: Number(attr(storage, 'maxRepetition') ?? 1) || 1,
     kommentar: text(kind(f, 'Comment')) || null,
+    naechsterSerienwert: auto && kind(auto, 'Serial') && attr(kind(auto, 'Serial'), 'nextValue') !== null ? Number(attr(kind(auto, 'Serial'), 'nextValue')) : null,
   };
 }
 
@@ -224,6 +225,7 @@ function saveAsXmlDatei(root: Knoten, dateiname: string): FmDatei {
       autoEingabe: kind(f, 'AutoEnter') ? [attr(kind(f, 'AutoEnter'), 'type') ?? 'AutoEnter'] : [],
       validierung: kind(f, 'Validation') ? ['Validation'] : [], global: istWahr(attr(kind(f, 'Storage'), 'global')),
       wiederholungen: Number(attr(kind(f, 'Storage'), 'maxRepetitions') ?? 1) || 1, kommentar: text(kind(f, 'Comment')) || null,
+      naechsterSerienwert: null,
     }));
     felderJeTabelle.set(tab, [...(felderJeTabelle.get(tab) ?? []), ...felder]);
   }

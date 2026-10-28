@@ -3,6 +3,8 @@ export type FmFeld = {
   id: string; name: string; typ: string; art: 'Normal' | 'Calculated' | 'Summary' | string;
   formel: string | null; autoEingabe: string[]; validierung: string[]; global: boolean; wiederholungen: number;
   kommentar: string | null;
+  /** Auto-Eingabe Seriennummer: naechster Wert (z. B. fuer den Zaehlerstart der Rechnungsnummer) */
+  naechsterSerienwert: number | null;
 };
 
 export type FmTabelle = { id: string; name: string; datensaetze: number | null; felder: FmFeld[] };

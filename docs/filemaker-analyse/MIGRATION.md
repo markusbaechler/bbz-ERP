@@ -25,7 +25,7 @@ npm run migrate
 npm run fm:import -- --ordner "C:\Export\FileMaker" --mapping mapping.json                                  # Probelauf
 npm run fm:import -- --ordner "C:\Export\FileMaker" --mapping mapping.json --zaehler-start 33215 --ausfuehren   # Import
 ```
-- `--zaehler-start` = **nächster Serienwert** der Rechnungsnummer in FileMaker (DDR: Feld RgNr → Auto-Eingabe → nächster Wert). Damit schliesst die erste ERP-Rechnung **lückenlos** an. Ohne Angabe gilt das Maximum der importierten RgNr.
+- `--zaehler-start` = **nächster Serienwert** der Rechnungsnummer in FileMaker. `npm run fm:analyse` weist ihn im Bericht unter „Zählerstände“ aus. Damit schliesst die erste ERP-Rechnung **lückenlos** an. Ohne Angabe gilt das Maximum der importierten RgNr.
 - Der Bericht `IMPORT-BERICHT.md` liegt im Exportordner. Er enthält Zähler je Tabelle, Fehlerzeilen (werden nicht übernommen), Hinweise sowie **Summen zum Abgleich** (Projekte und Budget je Jahr, Rechnungen brutto/bezahlt/offen, offene Posten je Debitor).
 - Der Import ist **idempotent**: Erneute Läufe erkennen bestehende Datensätze (Nummer, Kürzel, E-Mail, RgNr) und legen nichts doppelt an. Fehlerzeilen korrigiert man in FileMaker und exportiert neu.
 

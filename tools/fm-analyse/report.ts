@@ -33,6 +33,12 @@ export function berichtMarkdown(inv: FmInventar, a: Analyse, opts: { mitKonten?:
   }
   z.push('');
 
+  const serien = inv.dateien.flatMap((d) => d.tabellen.flatMap((t) => t.felder.filter((f) => f.naechsterSerienwert !== null)
+    .map((f) => `- ${esc(d.name)}::${esc(t.name)}::${esc(f.name)} – naechster Wert **${f.naechsterSerienwert}**`)));
+  if (serien.length) {
+    z.push('### Zaehlerstaende (Seriennummern)', '', 'Fuer die Migration: der naechste Wert der Rechnungsnummer ist der `--zaehler-start` von `npm run fm:import`.', '', ...serien, '');
+  }
+
   z.push('## 4. Beziehungen', '');
   for (const d of inv.dateien) for (const b of d.beziehungen) {
     const bed = b.bedingungen.map((x) => `${x.links} ${x.typ === 'Equal' ? '=' : x.typ} ${x.rechts}`).join(' UND ');
