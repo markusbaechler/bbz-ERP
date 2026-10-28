@@ -193,3 +193,10 @@ export async function verwerfeAnfrage(pool: pg.Pool, id: string, input: { grund?
     return mapAnfrage(r.rows[0]);
   });
 }
+
+/** Automatische Uebernahme (z. B. SAQ-Formular -> SAQ-Fall): Anfrage bleibt als Herkunftsnachweis mit Rohdaten erhalten. */
+export async function markiereAnfrageUebernommen(db: Db, id: string, input: { kontaktId: string | null }): Promise<void> {
+  await db.query(
+    `update anfrage set status='uebernommen', kontakt_id=coalesce($2, kontakt_id), erledigt_am=now()
+     where id=$1 and status in ('neu','in_bearbeitung')`, [id, input.kontaktId]);
+}

@@ -3,8 +3,10 @@ import type pg from 'pg';
 import { mitIdempotenz } from '../publicSchutz';
 import { listOeffentlicheKurse, getOeffentlichenKurs } from '../../repos/kursangebotRepo';
 import { meldeAn } from '../../repos/anmeldungRepo';
-import { createAnfrage } from '../../repos/anfrageRepo';
-import { findeOrganisationPerName, findeDurchfuehrungPerCode } from '../../repos/zuordnungRepo';
+import { createAnfrage, markiereAnfrageUebernommen } from '../../repos/anfrageRepo';
+import { createSaqFall } from '../../repos/saqRepo';
+import { inTransaktion } from '../../repos/db';
+import { findeOrganisationPerName, findeDurchfuehrungPerCode, auftraggeberZuOrganisation } from '../../repos/zuordnungRepo';
 import { normalisiereFormular, type FormularBefehl } from '../../integrations/formulare';
 import { ValidationError, NotFoundError, ConflictError } from '../../domain/errors';
 
@@ -49,12 +51,23 @@ export async function fuehreBefehlAus(pool: pg.Pool, b: FormularBefehl, kontext:
     return { status: 201, body: { status: r.anmeldung.status, warteliste: r.warteliste, wartelistenPosition: r.anmeldung.wartelistenPosition, referenz: r.anmeldung.id } };
   }
   if (b.art === 'saq') {
-    // SAQ-Anmeldungen landen bis zur Freischaltung des SAQ-Moduls als Anfrage (interesse zertifizierung) mit allen Angaben.
-    const a = await createAnfrage(pool, { quelle: 'homepage', typ: 'offerte', anrede: b.kontakt.anrede, vorname: b.kontakt.vorname,
-      nachname: b.kontakt.nachname, email: b.kontakt.email, telefon: b.kontakt.telefon, organisationName: b.organisationName,
-      funktion: b.rolle, interesse: 'zertifizierung', nachricht: `SAQ ${b.profil} · ${b.umfang} · ${b.variante} · ${b.sprache}${b.bemerkung ? `\n${b.bemerkung}` : ''}`,
-      einwilligung: true, payload: { ...payload, saq: b } });
-    return { status: 201, body: { status: 'eingegangen', referenz: a.id } };
+    // Herkunftsnachweis (Anfrage mit Rohdaten) + SAQ-Zertifizierungsvorgang in einer Transaktion
+    return inTransaktion(pool, async (c) => {
+      const anfrage = await createAnfrage(c, { quelle: 'homepage', typ: 'offerte', anrede: b.kontakt.anrede, vorname: b.kontakt.vorname,
+        nachname: b.kontakt.nachname, email: b.kontakt.email, telefon: b.kontakt.telefon, organisationName: b.organisationName,
+        funktion: b.rolle, interesse: 'zertifizierung', nachricht: `SAQ-Anmeldung ${b.profil} (${b.umfang}, ${b.variante}, ${b.sprache})`, einwilligung: true, payload });
+      const fall = await createSaqFall(c, {
+        kontakt: { email: b.kontakt.email, anrede: b.kontakt.anrede, vorname: b.kontakt.vorname, nachname: b.kontakt.nachname,
+          telefon: b.kontakt.telefon ?? b.kontakt.mobile, geburtsdatum: b.kontakt.geburtsdatum, funktion: b.rolle },
+        organisationId, rechnungsempfaengerId: await auftraggeberZuOrganisation(c, organisationId),
+        profil: b.profil, umfang: b.umfang, variante: b.variante, sprache: b.sprache, rolle: b.rolle,
+        digitaleHilfsmittel: b.digitaleHilfsmittel, einwilligungRechnungBank: b.einwilligungRechnungBank,
+        einwilligungWeitergabeGruppe: b.einwilligungWeitergabeGruppe, anfrageId: anfrage.id,
+        bemerkung: [b.bemerkung, !organisationId && b.organisationName ? `Bank laut Anmeldung: ${b.organisationName}` : null].filter(Boolean).join('\n') || null,
+      });
+      await markiereAnfrageUebernommen(c, anfrage.id, { kontaktId: fall.kontaktId });
+      return { status: 201, body: { status: 'angemeldet', referenz: fall.id } };
+    });
   }
   const a = await createAnfrage(pool, { quelle: 'homepage', typ: b.typ, anrede: b.kontakt.anrede, vorname: b.kontakt.vorname,
     nachname: b.kontakt.nachname, email: b.kontakt.email, telefon: b.kontakt.telefon, organisationName: b.organisationName,

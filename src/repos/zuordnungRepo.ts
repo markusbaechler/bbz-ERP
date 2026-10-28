@@ -45,3 +45,10 @@ export async function anmeldungenZuMoodleAbschluss(db: Db, moodleKursId: number,
      where d.moodle_kurs_id=$1 and k.moodle_user_id=$2 and a.status in ('bestaetigt','teilgenommen')`, [moodleKursId, moodleUserId]);
   return r.rows.map((x: any) => x.id);
 }
+
+/** Debitor (Auftraggeber) einer CRM-Organisation, falls verknuepft. */
+export async function auftraggeberZuOrganisation(db: Db, organisationId: string | null): Promise<string | null> {
+  if (!organisationId) return null;
+  const r = await db.query('select id from auftraggeber where organisation_id=$1 and aktiv', [organisationId]);
+  return r.rowCount ? r.rows[0].id : null;
+}
