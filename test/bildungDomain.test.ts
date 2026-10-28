@@ -6,7 +6,7 @@ import {
 import { annullationsgebuehr } from '../src/domain/annullation';
 import { rezertifizierungsStatus, standardGueltigBis } from '../src/domain/rezertifizierung';
 import { berechneBelegung, pruefeTeilnahmeStatus, AKTIVE_ANMELDESTATUS } from '../src/domain/bildungTypes';
-import { ANNULLATION, REZERTIFIZIERUNG, MOODLE } from '../src/config/bildung';
+import { ANNULLATION_OEFFENTLICH, REZERTIFIZIERUNG, MOODLE } from '../src/config/bildung';
 import { ConflictError, ValidationError } from '../src/domain/errors';
 
 describe('kursplanung', () => {
@@ -60,27 +60,33 @@ describe('kursplanung', () => {
 });
 
 describe('annullation', () => {
-  it('Konfiguration ist als Daten hinterlegt', () => {
-    expect(ANNULLATION.map((s) => s.prozent)).toEqual([0, 50, 100]);
+  it('Konfiguration ist als Daten hinterlegt (AGB oeffentliche Kurse)', () => {
+    expect(ANNULLATION_OEFFENTLICH.map((s) => s.prozent)).toEqual([0, 100]);
     expect(REZERTIFIZIERUNG).toEqual({ lernstundenSoll: 24, gueltigkeitMonate: 36 });
     expect(MOODLE).toEqual({ einschreibenTageVorBeginn: 14, zugangTageNachEnde: 60 });
   });
-  it('Staffel: >=30 Tage 0 %, 29-14 Tage 50 %, <14 Tage 100 %', () => {
+  it('AGB: mehr als 30 Tage vor Beginn 0 %, 30 Tage oder weniger 100 %', () => {
     const start = '2026-12-01';
-    expect(annullationsgebuehr(1200, start, '2026-11-01')).toEqual({ tageVorBeginn: 30, prozent: 0, gebuehrChf: 0 });
-    expect(annullationsgebuehr(1200, start, '2026-11-02')).toEqual({ tageVorBeginn: 29, prozent: 50, gebuehrChf: 600 });
-    expect(annullationsgebuehr(1200, start, '2026-11-17')).toEqual({ tageVorBeginn: 14, prozent: 50, gebuehrChf: 600 });
-    expect(annullationsgebuehr(1200, start, '2026-11-18')).toEqual({ tageVorBeginn: 13, prozent: 100, gebuehrChf: 1200 });
-    expect(annullationsgebuehr(1200, start, '2026-12-03').prozent).toBe(100);   // nach Kursbeginn
+    expect(annullationsgebuehr(1200, start, '2026-10-31')).toEqual({ tageVorBeginn: 31, prozent: 0, gebuehrChf: 0 });
+    expect(annullationsgebuehr(1200, start, '2026-11-01')).toEqual({ tageVorBeginn: 30, prozent: 100, gebuehrChf: 1200 });
+    expect(annullationsgebuehr(1200, start, '2026-11-30')).toEqual({ tageVorBeginn: 1, prozent: 100, gebuehrChf: 1200 });
+    expect(annullationsgebuehr(1200, start, '2026-12-03').prozent).toBe(100);   // Abbruch nach Kursbeginn
   });
   it('rundet auf 5 Rappen und behandelt fehlenden Preis als 0', () => {
-    expect(annullationsgebuehr(1234.55, '2026-12-01', '2026-11-20').gebuehrChf).toBe(1234.55);
-    expect(annullationsgebuehr(99.9, '2026-12-01', '2026-11-10').gebuehrChf).toBe(49.95);
+    expect(annullationsgebuehr(1234.57, '2026-12-01', '2026-11-20').gebuehrChf).toBe(1234.55);
     expect(annullationsgebuehr(null, '2026-12-01', '2026-11-30').gebuehrChf).toBe(0);
   });
-  it('akzeptiert eine abweichende Staffel', () => {
-    const staffel = [{ abTagenVorBeginn: 7, prozent: 0 }, { abTagenVorBeginn: 0, prozent: 25 }];
-    expect(annullationsgebuehr(400, '2026-12-01', '2026-11-28', staffel).gebuehrChf).toBe(100);
+  it('Staffel ist ein Parameter (z. B. 90/60/30 Tage fuer Kundenprojekte)', () => {
+    const staffel = [
+      { mehrAlsTageVorBeginn: 90, prozent: 0 }, { mehrAlsTageVorBeginn: 60, prozent: 25 },
+      { mehrAlsTageVorBeginn: 30, prozent: 50 }, { mehrAlsTageVorBeginn: Number.NEGATIVE_INFINITY, prozent: 100 },
+    ];
+    expect(annullationsgebuehr(99.9, '2026-12-01', '2026-10-01', staffel)).toEqual({ tageVorBeginn: 61, prozent: 25, gebuehrChf: 25 });
+    expect(annullationsgebuehr(99.9, '2026-12-01', '2026-10-31', staffel).gebuehrChf).toBe(49.95);
+    expect(annullationsgebuehr(99.9, '2026-12-01', '2026-08-01', staffel).gebuehrChf).toBe(0);
+    // Staffel ohne Auffangstufe: strengste Stufe gilt
+    expect(annullationsgebuehr(400, '2026-12-01', '2026-11-28', [{ mehrAlsTageVorBeginn: 7, prozent: 0 }, { mehrAlsTageVorBeginn: 0, prozent: 25 }]).gebuehrChf).toBe(100);
+    expect(annullationsgebuehr(400, '2026-12-01', '2026-12-02', [{ mehrAlsTageVorBeginn: 7, prozent: 0 }, { mehrAlsTageVorBeginn: 0, prozent: 25 }]).gebuehrChf).toBe(100);
   });
 });
 
