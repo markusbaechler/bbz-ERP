@@ -79,15 +79,8 @@ Wichtige Umgebungsvariablen: `.env.example`.
 ## Offene Punkte / nächste Schritte
 1. **FileMaker-Analyse** (28.10.2026, lokale Session mit Computer Use): Kein Konto mit [Vollzugriff], daher kein DDR. Analysiert wurde stattdessen der Script-Ausdruck aller 33 Dateien (Weg D, `ANLEITUNG.md`). Ergebnis und Lückenliste mit Entscheid: `docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md`.
    - Geschlossen: camt.054-Import, Kontenauswertung, Anmeldeliste je Institut, Postadresse in der Teilnehmerliste.
-   - Offen für die Fachseite (Lücken 6–13):
-     - IGK als zweiter Mandant
-     - Halbjahres-/Sammelrechnung je Bank
-     - Preisstufen IGK/fremd
-     - Spesen
-     - weitere Briefe
-     - Seminarbeurteilung
-     - Rechnung per Mail mit PDF
-     - Lieferschein
+   - Auskunft Fachseite: Mandant IGK nicht mehr aktiv (ins bbz integriert); Kursbriefe, Beurteilung und Statistik laufen im LMS. Lieferschein entfällt.
+   - Zu bauen (in Gebrauch): Sammelrechnung je Bank, Rechnung per Mail mit PDF, Spesen weiterverrechnen.
    - Mit Vollzugriff den DDR nachziehen (Weg A).
 2. **Echte Exporte migrieren** gemäss `docs/filemaker-analyse/MIGRATION.md`: Probelauf, Summenabgleich, `--zaehler-start` = nächste FM-RgNr.
 3. **Moodle (cometas)**: Web-Service-Token und Funktionsliste beantragen. Prüfen, ob die Face-to-Face-Signups per Web Service verfügbar sind (`/integration/moodle/status`).
