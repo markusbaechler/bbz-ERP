@@ -15,7 +15,9 @@
     "fm:import": "tsx tools/fm-import/cli.ts",
     "api:routen": "tsx tools/api-routen.ts",
     "moodle:abschluss": "tsx src/integrations/moodle/abschlussMain.ts",
-    "kuba:import": "tsx tools/kuba-import/cli.ts"
+    "kuba:import": "tsx tools/kuba-import/cli.ts",
+    "seed:demo": "tsx src/db/seedDemo.ts",
+    "test:e2e": "node test/e2e/smoke.mjs"
   },
   "dependencies": {
     "@fastify/static": "^7.0.4",

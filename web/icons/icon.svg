@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="bbz ERP">
+  <rect width="512" height="512" rx="104" fill="#004078"/>
+  <g transform="translate(256 250) scale(0.86) translate(-269 -262)" fill="#fff">
+    <path transform="translate(-50 0)" d="M120 140h28v74c12-14 28-21 47-21 40 0 66 31 66 75s-26 76-67 76c-20 0-36-8-47-23v19h-27zm69 77c-26 0-42 21-42 51s16 51 42 51 41-21 41-51-15-51-41-51z"/>
+    <path transform="translate(80 0)" d="M120 140h28v74c12-14 28-21 47-21 40 0 66 31 66 75s-26 76-67 76c-20 0-36-8-47-23v19h-27zm69 77c-26 0-42 21-42 51s16 51 42 51 41-21 41-51-15-51-41-51z"/>
+    <path transform="translate(68 0)" d="M296 196h104v23l-70 103h72v22H292v-23l70-103h-66z"/>
+  </g>
+  <rect x="96" y="380" width="320" height="20" rx="10" fill="#5b8dc4"/>
+</svg>
