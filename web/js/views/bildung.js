@@ -99,7 +99,7 @@ export async function durchfuehrungen(ctx) {
     store.kursangebote(),
   ]);
   ctx.zeige(html`
-    ${seitenkopf({ titel: 'Durchführungen', untertitel: 'Termine mit Belegung (aktiv / Kapazität, WL = Warteliste)', aktionen: html`<button type="button" class="bbz-button bbz-button-primary" data-action="df-neu">+ Durchführung</button>` })}
+    ${seitenkopf({ titel: 'Durchführungen', untertitel: 'Termine mit Belegung (aktiv / Kapazität, WL = Warteliste)', aktionen: html`${ctx.istAdmin ? html`<button type="button" class="bbz-button" data-action="moodle-kursdaten">Moodle-Buchungen importieren</button> ` : ''}<button type="button" class="bbz-button bbz-button-primary" data-action="df-neu">+ Durchführung</button>` })}
     ${bildungTabs('durchfuehrungen')}
     <form class="bbz-filterbar compact" data-form="filter" aria-label="Durchführungen filtern">
       ${feld({ name: 'von', label: 'Ab Datum', typ: 'date', wert: von, attr: { 'data-change': 'filter' } })}
@@ -131,6 +131,27 @@ export async function durchfuehrungen(ctx) {
   ctx.aktion('df-neu', async () => {
     const r = await durchfuehrungFormular({ kursangebotId: q.kursangebotId });
     if (r?.id) { toast(`Durchführung ${r.code} geplant`, 'success'); ctx.navigiere(`/bildung/durchfuehrung/${r.id}`); }
+  });
+  // Moodle-Bericht "Anmeldungen Kursdaten V2" (Berichtsgenerator, CSV) – Zuordnung ueber die Seminarnummer
+  ctx.aktion('moodle-kursdaten', async () => {
+    const e = await formModal({
+      titel: 'Moodle-Buchungen importieren', submitText: 'Importieren', testid: 'moodle-kursdaten',
+      felder: formGrid(
+        html`<p class="bbz-span-2 bbz-small bbz-muted">CSV-Export des Moodle-Berichts «Anmeldungen Kursdaten V2». Die Zeilen werden über die Seminarnummer der Durchführung zugeordnet; Bank und abweichende Rechnungsadresse werden übernommen. Ein erneuter Import legt nichts doppelt an.</p>`,
+        feld({ name: 'datei', label: 'CSV-Datei', typ: 'file', pflicht: true, span2: true, attr: { accept: '.csv,text/csv' } }),
+      ),
+      onSubmit: async (_w, form) => {
+        const datei = form.querySelector('input[type=file]').files?.[0];
+        if (!datei) throw new Error('Keine Datei gewählt');
+        return post('/integration/moodle/kursdaten', { csv: await datei.text() });
+      },
+    });
+    if (!e) return;
+    const neu = e.seminare.reduce((s, x) => s + x.neu, 0);
+    const fehler = e.seminare.reduce((s, x) => s + x.fehler.length, 0);
+    toast(`${neu} Anmeldung(en) übernommen aus ${e.seminare.length} Durchführung(en)`, e.unbekannteSeminarnummern.length || fehler ? 'warning' : 'success');
+    if (e.unbekannteSeminarnummern.length) toast(`Seminarnummern ohne Durchführung: ${e.unbekannteSeminarnummern.join(', ')}`, 'warning');
+    ctx.neu();
   });
 }
 

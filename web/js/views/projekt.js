@@ -17,7 +17,7 @@ const SPALTEN = ['offen', 'in_arbeit', 'review', 'erledigt'];
 
 const TABS = [
   ['uebersicht', 'Übersicht'], ['aufgaben', 'Aufgaben'], ['gantt', 'Gantt'], ['phasen', 'Phasen & Meilensteine'],
-  ['zeit', 'Zeiterfassung'], ['einsaetze', 'Einsätze'], ['rechnungen', 'Rechnungen'],
+  ['zeit', 'Zeiterfassung'], ['einsaetze', 'Einsätze'], ['spesen', 'Spesen'], ['rechnungen', 'Rechnungen'],
 ];
 
 export async function detail(ctx) {
@@ -324,9 +324,69 @@ const TAB_RENDER = {
     };
   },
 
+  async spesen(ctx, { id, p }) {
+    const spesen = await get(`/projekt/${id}/spesen`);
+    const offen = spesen.filter((s) => s.verrechenbar && !s.rechnungspositionId);
+    const gesperrt = ['archiviert', 'abgesagt'].includes(p.status);
+    ctx.formular('spesen-neu', async (f, w) => {
+      await post(`/projekt/${id}/spesen`, ohneLeere({ ...w, menge: w.art === 'km' ? w.menge : undefined, verrechenbar: w.verrechenbar }));
+      toast('Spesen erfasst', 'success');
+      ctx.neu();
+    });
+    ctx.aktion('spesen-loeschen', async (el) => {
+      if (!(await bestaetigen('Spesen löschen?', { okText: 'Löschen', gefahr: true }))) return;
+      await del(`/spesen/${el.dataset.id}`); toast('Spesen gelöscht', 'success'); ctx.neu();
+    });
+    return {
+      inhalt: html`
+        ${gesperrt ? '' : sektion({
+          titel: 'Spesen erfassen', untertitel: 'werden an den Kunden weiterverrechnet (km mit Ansatz pro km, Auslagen als Betrag)',
+          inhalt: html`<form data-form="spesen-neu" class="bbz-form-grid" data-testid="spesen-form">
+            ${feld({ name: 'datum', label: 'Datum', typ: 'date', wert: heute(), pflicht: true })}
+            ${feld({ name: 'art', label: 'Art', typ: 'select', optionen: [['km', 'Fahrt (km)'], ['auslage', 'Auslage (Betrag)']], wert: 'km' })}
+            ${feld({ name: 'beschreibung', label: 'Beschreibung', pflicht: true, span2: true, attr: { placeholder: 'z. B. Fahrt St. Gallen–Zürich, Hotel' } })}
+            ${feld({ name: 'menge', label: 'Kilometer', typ: 'number', hint: 'nur bei Fahrt', attr: { min: 0.1, step: '0.1' } })}
+            ${feld({ name: 'ansatzChf', label: 'CHF pro km bzw. Betrag', typ: 'number', pflicht: true, wert: '0.70', attr: { min: 0, step: '0.05' } })}
+            ${feld({ name: 'verrechenbar', label: 'verrechenbar', typ: 'checkbox', wert: true })}
+            <div class="bbz-field"><button type="submit" class="bbz-button bbz-button-primary">Erfassen</button></div></form>`,
+        })}
+        ${sektion({
+          titel: `Spesen (${spesen.length})`, untertitel: `offen zu verrechnen: ${chf(offen.reduce((s, x) => s + x.betragChf, 0))}`, flush: true,
+          inhalt: tabelle({
+            zeilen: [...spesen].reverse(), leer: 'Noch keine Spesen erfasst', beschriftung: 'Spesen',
+            spalten: [
+              { titel: 'Datum', klasse: 'nowrap', wert: (s) => datum(s.datum) },
+              { titel: 'Beschreibung', wert: (s) => s.beschreibung },
+              { titel: 'Menge', klasse: 'num', wert: (s) => (s.art === 'km' ? `${zahl(s.menge)} km` : '–') },
+              { titel: 'Ansatz', klasse: 'num', wert: (s) => chf(s.ansatzChf) },
+              { titel: 'Betrag', klasse: 'num', wert: (s) => chf(s.betragChf) },
+              { titel: 'Status', wert: (s) => (s.rechnungspositionId ? chip('verrechnet', 'green') : s.verrechenbar ? chip('offen', 'amber') : chip('intern')) },
+              { titel: '', klasse: 'act', wert: (s) => (s.rechnungspositionId ? '' : html`<button type="button" class="bbz-icon-btn" data-action="spesen-loeschen" data-id="${s.id}" aria-label="Spesen vom ${datum(s.datum)} löschen">✕</button>`) },
+            ],
+          }),
+        })}`,
+    };
+  },
+
   async rechnungen(ctx, { id }) {
-    const [rechnungen, cockpit] = await Promise.all([get('/rechnung', { projektId: id }), get(`/projekt/${id}/cockpit`)]);
+    const [rechnungen, cockpit, spesen] = await Promise.all([get('/rechnung', { projektId: id }), get(`/projekt/${id}/cockpit`), get(`/projekt/${id}/spesen`, { offen: 'true' })]);
     const entwuerfe = rechnungen.filter((r) => ['offen_prov', 'def_vereinbart'].includes(r.status));
+    const spesenOffen = spesen.filter((s) => s.verrechenbar);
+    ctx.aktion('spesen-verrechnen', async () => {
+      const MWST = await store.mwstOptionen();
+      const r = await formModal({
+        titel: 'Spesen verrechnen', submitText: 'Verrechnen', testid: 'spesen-verrechnen',
+        felder: formGrid(
+          html`<p class="bbz-span-2 bbz-small bbz-muted">${spesenOffen.length} offene Spesen über ${chf(spesenOffen.reduce((s, x) => s + x.betragChf, 0))} werden als Positionen gebucht – auf einen neuen oder einen bestehenden Entwurf (z. B. zusammen mit der Zeit).</p>`,
+          feld({ name: 'datum', label: 'Rechnungsdatum', typ: 'date', wert: heute(), pflicht: true }),
+          feld({ name: 'bis', label: 'Spesen bis', typ: 'date', hint: 'leer = alle' }),
+          feld({ name: 'mwstSatz', label: 'MWSt-Satz', typ: 'select', optionen: MWST, wert: '8.1' }),
+          feld({ name: 'rechnungId', label: 'Auf bestehenden Entwurf buchen', typ: 'select', optionen: entwuerfe.map((x) => [x.id, `${datum(x.datum)} · ${chf(x.totalBrutto)}`]), leerOption: '– neuer Entwurf –', span2: true }),
+        ),
+        onSubmit: (w) => post(`/projekt/${id}/spesen-verrechnen`, ohneLeere({ ...w, mwstSatz: Number(w.mwstSatz) })),
+      });
+      if (r?.rechnung) { toast(`${r.positionen.length} Spesen verrechnet`, 'success'); ctx.navigiere(`/finanzen/rechnung/${r.rechnung.id}`); }
+    });
     ctx.aktion('zeit-verrechnen', async () => {
       const MWST = await store.mwstOptionen();
       const r = await formModal({
@@ -346,7 +406,7 @@ const TAB_RENDER = {
     return {
       inhalt: sektion({
         titel: `Rechnungen (${rechnungen.length})`, untertitel: `Unverrechnete Leistungen: ${chf(cockpit.unverrechnetChf)}`, flush: true,
-        aktionen: ctx.istAdmin ? html`<button type="button" class="bbz-button bbz-button-sm bbz-button-primary" data-action="zeit-verrechnen">Zeit verrechnen</button>` : '',
+        aktionen: ctx.istAdmin ? html`${spesenOffen.length ? html`<button type="button" class="bbz-button bbz-button-sm" data-action="spesen-verrechnen">Spesen verrechnen</button> ` : ''}<button type="button" class="bbz-button bbz-button-sm bbz-button-primary" data-action="zeit-verrechnen">Zeit verrechnen</button>` : '',
         inhalt: tabelle({
           zeilen: rechnungen, leer: 'Noch keine Rechnungen', href: (r) => `#/finanzen/rechnung/${r.id}`,
           spalten: [

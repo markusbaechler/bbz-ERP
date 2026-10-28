@@ -106,7 +106,8 @@ export async function detail(ctx) {
         <dt>Kursleitung</dt><dd>${ma.find((m) => m.id === d.leitungId) ? store.maLabel(ma.find((m) => m.id === d.leitungId)) : '–'}</dd>
         <dt>Öffentlich</dt><dd>${d.oeffentlich ? 'ja (Homepage)' : 'nein'}</dd>
         <dt>Rechnung an</dt><dd>${d.auftraggeberId ? agMap.get(d.auftraggeberId)?.name ?? '–' : 'je Teilnehmer:in (Debitor der Organisation)'}</dd>
-        <dt>Moodle-Kurs</dt><dd>${d.moodleKursId ?? '–'}</dd></dl>` })}
+        <dt>Moodle-Kurs</dt><dd>${d.moodleKursId ?? '–'}</dd>
+        <dt>Seminarnummer</dt><dd>${d.seminarnummer ?? '–'}</dd></dl>` })}
     </div>`);
 
   /* ---------- Aktionen ---------- */
@@ -135,6 +136,7 @@ export async function detail(ctx) {
         feld({ name: 'minTeilnehmende', label: 'Min. Teilnehmende', typ: 'number', wert: d.minTeilnehmende, attr: { min: 0, step: 1 } }),
         feld({ name: 'preisChf', label: 'Preis CHF', typ: 'number', wert: d.preisChf, attr: { min: 0, step: '0.05' } }),
         feld({ name: 'moodleKursId', label: 'Moodle-Kurs-ID', typ: 'number', wert: d.moodleKursId, attr: { min: 1, step: 1 } }),
+        feld({ name: 'seminarnummer', label: 'Seminarnummer (Moodle-Termin)', wert: d.seminarnummer, hint: 'Feld «Seminarnummer» des Face-to-Face-Termins; Schlüssel für den Buchungsimport' }),
         feld({ name: 'projektId', label: 'Projekt (Kostenträger)', typ: 'select', optionen: projekte.map((p) => [p.id, store.projektLabel(p)]), wert: d.projektId, leerOption: '– keines –', span2: true }),
         feld({ name: 'auftraggeberId', label: 'Rechnung an (Firmenkurs)', typ: 'select', optionen: ag.map((a) => [a.id, a.name]), wert: d.auftraggeberId, leerOption: '– je Teilnehmer:in –', span2: true }),
         feld({ name: 'leitungId', label: 'Kursleitung', typ: 'select', optionen: store.maOptionen(ma), wert: d.leitungId, leerOption: '– offen –' }),

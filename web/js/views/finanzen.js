@@ -1,17 +1,23 @@
-// Finanzen: Rechnungen (Liste, Detail mit Positionen, PDF, Festschreiben, Storno, Zahlung), offene Posten + Saldo,
-// Mahnwesen (Vorschlag + Mahnlauf; Hinweis-Panel, solange die Route auf dem Server fehlt).
+// Finanzen: Rechnungen (Liste, Detail mit Positionen, PDF, Mail, Festschreiben, Storno, Zahlung), offene Posten + Saldo,
+// Zahlungsimport (camt.054), Mahnwesen (Vorschlag + Mahnlauf), Sammelrechnung je Bank, Kontenauswertung.
 import { get, post, istModulFehlt, herunterladen } from '../api.js';
 import * as store from '../store.js';
 import {
   html, raw, seitenkopf, tabs, sektion, tabelle, feld, formGrid, formModal, formWerte, ohneLeere, datum, chf, zahl, label, optionenAus,
-  statusChip, chip, banner, heute, addTage, tageZwischen, toast, bestaetigen, kpi, modal, modulFehlt, leerHinweis,
+  statusChip, chip, banner, heute, addTage, tageZwischen, toast, bestaetigen, kpi, modal, modulFehlt, leerHinweis, setHtml,
 } from '../ui.js';
 
 const finanzTabs = (aktiv) => tabs([
   { href: '#/finanzen/rechnungen', label: 'Rechnungen', aktiv: aktiv === 'rechnungen' },
   { href: '#/finanzen/offene-posten', label: 'Offene Posten', aktiv: aktiv === 'op' },
+  { href: '#/finanzen/zahlungen', label: 'Zahlungsimport', aktiv: aktiv === 'zahlungen' },
   { href: '#/finanzen/mahnwesen', label: 'Mahnwesen', aktiv: aktiv === 'mahnwesen' },
+  { href: '#/finanzen/sammelrechnung', label: 'Sammelrechnung', aktiv: aktiv === 'sammelrechnung' },
+  { href: '#/finanzen/auswertung', label: 'Kontenauswertung', aktiv: aktiv === 'auswertung' },
 ], 'Finanzen');
+const istIso = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s ?? '');
+const nurAdmin = (ctx, titel, tab) =>
+  ctx.zeige(html`${seitenkopf({ titel })}${finanzTabs(tab)}${banner('Diese Funktion steht der Administration zur Verfügung.', 'info')}`);
 const ZAHLUNGSFRIST = 30;
 const STUFE = { 1: 'Erinnerung', 2: '2. Mahnung', 3: '3. Mahnung' };
 /** Route /rechnung/:id/mahnungen fehlt auf dem Server (Modul nicht ausgerollt): nicht bei jedem Rendern erneut anfragen. */
@@ -86,6 +92,7 @@ export async function rechnung(ctx) {
       untertitel: html`${statusChip('rechnungStatus', r.status)} · ${a?.name ?? ''} · ${datum(r.datum)}${p ? html` · Projekt <a class="bbz-link" href="#/projekt/${p.id}/rechnungen">${p.nummer}</a>` : ''}`,
       aktionen: html`
         <button type="button" class="bbz-button" data-action="pdf">PDF</button>
+        ${ctx.istAdmin && ['abgerechnet', 'bezahlt'].includes(r.status) ? html`<button type="button" class="bbz-button" data-action="mail">Per E-Mail</button>` : ''}
         ${ctx.istAdmin && entwurf ? html`<button type="button" class="bbz-button" data-action="position">+ Position</button>` : ''}
         ${ctx.istAdmin && r.status === 'offen_prov' ? html`<button type="button" class="bbz-button" data-action="def-vereinbart">Definitiv vereinbart</button>` : ''}
         ${ctx.istAdmin && entwurf ? html`<button type="button" class="bbz-button bbz-button-primary" data-action="festschreiben" ${r.positionen.length ? '' : raw('disabled')}>Festschreiben</button>` : ''}
@@ -125,6 +132,17 @@ export async function rechnung(ctx) {
 
   const fertig = (m) => { toast(m, 'success'); ctx.neu(); };
   ctx.aktion('pdf', () => herunterladen(`/rechnung/${id}/pdf`, { dateiname: `rechnung-${r.nummer ?? 'entwurf'}.pdf`.replace(/\s+/g, ''), oeffnen: true }));
+  ctx.aktion('mail', async () => {
+    const m = await formModal({
+      titel: `Rechnung ${r.nummer} per E-Mail`, submitText: 'Versenden', testid: 'rechnung-mail',
+      felder: formGrid(
+        html`<p class="bbz-span-2 bbz-small bbz-muted">Die Rechnung geht mit dem QR-PDF als Anhang in den Versand (Outbox). Leer = E-Mail-Adresse des Debitors${a?.email ? ` (${a.email})` : ''}.</p>`,
+        feld({ name: 'an', label: 'An', typ: 'email', wert: '', span2: true, attr: { placeholder: a?.email ?? 'buchhaltung@bank.ch' } }),
+      ),
+      onSubmit: (w) => post(`/rechnung/${id}/mail`, ohneLeere(w)),
+    });
+    if (m) toast(`Rechnung an ${m.an} in den Versand gestellt`, 'success');
+  });
   ctx.aktion('position', async () => {
     const MWST = await store.mwstOptionen();
     const x = await formModal({
@@ -277,4 +295,178 @@ export async function mahnwesen(ctx) {
       onClose: () => ctx.neu(),
     });
   });
+}
+
+/* ---------- Zahlungsimport (camt.054) ---------- */
+
+const camtErgebnis = (e) => html`
+  <div class="bbz-kpis" data-testid="camt-ergebnis">
+    ${kpi({ titel: 'Verbucht', zahl: e.verbucht.length, sub: chf(e.verbucht.reduce((s, v) => s + v.betrag, 0)) })}
+    ${kpi({ titel: 'Bereits verbucht', zahl: e.bereitsVerbucht, sub: 'nicht doppelt erfasst' })}
+    ${kpi({ titel: 'Nicht zugeordnet', zahl: e.nichtZugeordnet.length, sub: chf(e.nichtZugeordnet.reduce((s, n) => s + n.betrag, 0)) })}
+    ${kpi({ titel: 'Belastungen', zahl: e.belastungenIgnoriert, sub: 'nicht verbucht' })}
+  </div>
+  ${sektion({ titel: 'Verbuchte Zahlungen', flush: true, inhalt: tabelle({
+    zeilen: e.verbucht, leer: 'Keine Zahlung verbucht', href: (v) => `#/finanzen/rechnung/${v.rechnungId}`,
+    spalten: [
+      { titel: 'Rechnung', klasse: 'nowrap', wert: (v) => html`<a class="bbz-link" href="#/finanzen/rechnung/${v.rechnungId}">${v.nummer}</a>` },
+      { titel: 'Valuta', klasse: 'nowrap', wert: (v) => datum(v.datum) },
+      { titel: 'Betrag', klasse: 'num', wert: (v) => chf(v.betrag) },
+      { titel: 'Noch offen', klasse: 'num', wert: (v) => chf(v.offen) },
+      { titel: 'Status', wert: (v) => statusChip('rechnungStatus', v.rechnungStatus) },
+    ],
+  }) })}
+  ${e.nichtZugeordnet.length ? sektion({ titel: 'Nicht zugeordnet – manuell erfassen', flush: true, inhalt: tabelle({
+    zeilen: e.nichtZugeordnet, leer: '',
+    spalten: [
+      { titel: 'Valuta', klasse: 'nowrap', wert: (n) => datum(n.datum) },
+      { titel: 'Betrag', klasse: 'num', wert: (n) => chf(n.betrag) },
+      { titel: 'Referenz / Mitteilung', wert: (n) => n.referenz ?? n.mitteilung ?? '–' },
+      { titel: 'Grund', wert: (n) => chip(n.grund, 'amber') },
+    ],
+  }) }) : ''}`;
+
+export async function zahlungen(ctx) {
+  if (!ctx.istAdmin) return nurAdmin(ctx, 'Zahlungsimport', 'zahlungen');
+  ctx.zeige(html`
+    ${seitenkopf({ titel: 'Zahlungsimport', untertitel: 'Bankauszug camt.054 (QR-Zahlungen) verbuchen – Zuordnung über die QR-Referenz' })}
+    ${finanzTabs('zahlungen')}
+    <section class="bbz-section"><form data-form="camt" class="bbz-form-grid" data-testid="camt-form">
+      ${feld({ name: 'datei', label: 'camt.054-Datei (XML)', typ: 'file', pflicht: true, span2: true, attr: { accept: '.xml,application/xml,text/xml' } })}
+      <p class="bbz-span-2 bbz-small bbz-muted">Teilzahlungen bleiben als Restbetrag offen. Dieselbe Datei nochmals verbucht nichts doppelt. Zahlungen ohne passende Referenz bleiben stehen und werden aufgeführt.</p>
+      <div class="bbz-field"><button type="submit" class="bbz-button bbz-button-primary">Verbuchen</button></div>
+    </form></section>
+    <div data-ergebnis></div>`);
+  ctx.formular('camt', async (f) => {
+    const datei = f.querySelector('input[type=file]').files?.[0];
+    if (!datei) { toast('Keine Datei gewählt', 'warning'); return; }
+    const e = await post('/debitoren/camt054', { xml: await datei.text() });
+    toast(`${e.verbucht.length} Zahlung(en) verbucht${e.nichtZugeordnet.length ? `, ${e.nichtZugeordnet.length} nicht zugeordnet` : ''}`, e.nichtZugeordnet.length ? 'warning' : 'success');
+    setHtml(ctx.el.querySelector('[data-ergebnis]'), camtErgebnis(e));
+  });
+}
+
+/* ---------- Sammelrechnung je Bank ---------- */
+
+/** Standard-Zeitraum: das letzte abgeschlossene Halbjahr. */
+function letztesHalbjahr() {
+  const h = heute(); const j = Number(h.slice(0, 4));
+  return h.slice(5) > '06-30' ? { von: `${j}-01-01`, bis: `${j}-06-30` } : { von: `${j - 1}-07-01`, bis: `${j - 1}-12-31` };
+}
+
+export async function sammelrechnung(ctx) {
+  if (!ctx.istAdmin) return nurAdmin(ctx, 'Sammelrechnung', 'sammelrechnung');
+  const std = letztesHalbjahr();
+  const von = istIso(ctx.query.von) ? ctx.query.von : std.von;
+  const bis = istIso(ctx.query.bis) ? ctx.query.bis : std.bis;
+  const v = await get('/verrechnung/sammelrechnung', { von, bis });
+  const total = v.empfaenger.reduce((s, e) => s + e.betragChf, 0);
+  const ohne = [...v.ohneEmpfaenger.map((o) => ({ ...o, grund: 'kein Rechnungsempfänger' })), ...v.ohneProjekt.map((o) => ({ ...o, grund: 'Durchführung ohne Projekt' }))];
+  ctx.zeige(html`
+    ${seitenkopf({
+      titel: 'Sammelrechnung je Bank', untertitel: 'Alle offenen Anmeldungen der Kurse, die im Zeitraum beginnen – je Rechnungsempfänger eine Rechnung (Firmenkurse ausgenommen)',
+      aktionen: v.empfaenger.length ? html`<button type="button" class="bbz-button bbz-button-primary" data-action="sammel-erstellen">Rechnungsentwürfe erstellen</button>` : '',
+    })}
+    ${finanzTabs('sammelrechnung')}
+    <form class="bbz-filterbar compact" data-form="zeitraum" aria-label="Zeitraum">
+      ${feld({ name: 'von', label: 'Kursbeginn von', typ: 'date', wert: von, attr: { 'data-change': 'zeitraum' } })}
+      ${feld({ name: 'bis', label: 'bis', typ: 'date', wert: bis, attr: { 'data-change': 'zeitraum' } })}
+    </form>
+    <div class="bbz-kpis">
+      ${kpi({ titel: 'Rechnungsempfänger', zahl: v.empfaenger.length })}
+      ${kpi({ titel: 'Anmeldungen', zahl: v.empfaenger.reduce((s, e) => s + e.anmeldungen, 0) })}
+      ${kpi({ titel: 'Betrag', zahl: chf(total), sub: 'ohne Nebenkosten und MWSt' })}
+      ${kpi({ titel: 'Zu klären', zahl: ohne.length, sub: 'werden nicht verrechnet' })}
+    </div>
+    <div class="bbz-g2-wide">
+      ${sektion({ titel: 'Je Rechnungsempfänger', flush: true, testid: 'sammel-vorschau', inhalt: tabelle({
+        zeilen: v.empfaenger, leer: 'Nichts zu verrechnen in diesem Zeitraum',
+        spalten: [
+          { titel: 'Empfänger', wert: (e) => html`<a class="bbz-link" href="#/finanzen/rechnungen?auftraggeberId=${e.auftraggeberId}">${e.name}</a>` },
+          { titel: 'Anmeldungen', klasse: 'num', wert: (e) => e.anmeldungen },
+          { titel: 'Betrag', klasse: 'num', wert: (e) => chf(e.betragChf) },
+        ],
+        fuss: v.empfaenger.length ? html`<tr><td colspan="2">Total</td><td class="num">${chf(total)}</td></tr>` : '',
+      }) })}
+      ${sektion({ titel: `Zu klären (${ohne.length})`, untertitel: 'Rechnungsempfänger an der Anmeldung setzen oder die Person einer Organisation mit Debitor zuordnen', flush: true, inhalt: tabelle({
+        zeilen: ohne, leer: 'Alles zugeordnet',
+        spalten: [
+          { titel: 'Person', wert: (o) => o.name },
+          { titel: 'Durchführung', klasse: 'nowrap', wert: (o) => o.durchfuehrungCode ?? '–' },
+          { titel: 'Grund', wert: (o) => chip(o.grund, 'amber') },
+        ],
+      }) })}
+    </div>`);
+  ctx.aenderung('zeitraum', () => {
+    const w = formWerte(ctx.el.querySelector('form[data-form=zeitraum]'));
+    ctx.navigiere(`/finanzen/sammelrechnung?${new URLSearchParams(ohneLeere(w))}`);
+  });
+  ctx.formular('zeitraum', () => undefined);
+  ctx.aktion('sammel-erstellen', async () => {
+    const e = await formModal({
+      titel: 'Sammelrechnungen erstellen', submitText: 'Entwürfe erstellen', testid: 'sammel-form',
+      felder: formGrid(
+        html`<p class="bbz-span-2 bbz-small bbz-muted">${v.empfaenger.length} Rechnungsentwürfe über ${chf(total)} (zzgl. Nebenkosten/MWSt). Die Anmeldungen gelten danach als verrechnet; Festschreiben wie gewohnt in der Rechnung.</p>`,
+        feld({ name: 'datum', label: 'Rechnungsdatum', typ: 'date', wert: heute(), pflicht: true }),
+      ),
+      onSubmit: (w) => post('/verrechnung/sammelrechnung', { von, bis, datum: w.datum }),
+    });
+    if (!e) return;
+    modal({
+      titel: `${e.rechnungen.length} Sammelrechnung(en) erstellt`,
+      inhalt: html`<ul class="bbz-tl">${e.rechnungen.map((r) => html`<li><span class="dot" aria-hidden="true"></span><div><div class="h"><a class="bbz-link" href="#/finanzen/rechnung/${r.id}" data-modal-close>Entwurf ${datum(r.datum)}</a></div><div class="m">${r.positionen.length} Positionen · ${chf(r.totalBrutto)}</div></div></li>`)}</ul>`,
+      fuss: html`<button type="button" class="bbz-button bbz-button-primary" data-modal-close>OK</button>`,
+      onClose: () => ctx.neu(),
+    });
+  });
+}
+
+/* ---------- Kontenauswertung ---------- */
+
+export async function auswertung(ctx) {
+  if (!ctx.istAdmin) return nurAdmin(ctx, 'Kontenauswertung', 'auswertung');
+  const j = heute().slice(0, 4);
+  const von = istIso(ctx.query.von) ? ctx.query.von : `${j}-01-01`;
+  const bis = istIso(ctx.query.bis) ? ctx.query.bis : `${j}-12-31`;
+  const a = await get('/finanzen/konten-auswertung', { von, bis });
+  const summe = (l, f) => l.reduce((s, x) => s + x[f], 0);
+  const konto = (x) => (x.kontoNummer ? `${x.kontoNummer}${x.bezeichnung ? ` ${x.bezeichnung}` : ''}` : 'ohne Konto');
+  ctx.zeige(html`
+    ${seitenkopf({ titel: 'Kontenauswertung', untertitel: 'Ertrag festgeschriebener Rechnungen je Konto und Kunde (Storno netto 0), Honorare je Aufwandkonto' })}
+    ${finanzTabs('auswertung')}
+    <form class="bbz-filterbar compact" data-form="zeitraum" aria-label="Zeitraum">
+      ${feld({ name: 'von', label: 'Von', typ: 'date', wert: von, attr: { 'data-change': 'zeitraum' } })}
+      ${feld({ name: 'bis', label: 'Bis', typ: 'date', wert: bis, attr: { 'data-change': 'zeitraum' } })}
+    </form>
+    <div class="bbz-kpis">
+      ${kpi({ titel: 'Ertrag netto', zahl: chf(summe(a.ertrag, 'nettoChf')), testid: 'ertrag-total' })}
+      ${kpi({ titel: 'Honorare', zahl: chf(summe(a.aufwand, 'honorarChf')) })}
+      ${kpi({ titel: 'Deckungsbeitrag', zahl: chf(summe(a.ertrag, 'nettoChf') - summe(a.aufwand, 'honorarChf')), sub: 'Ertrag minus Honorare' })}
+    </div>
+    <div class="bbz-g2-wide">
+      <div>
+        ${sektion({ titel: 'Ertrag je Konto', flush: true, inhalt: tabelle({
+          zeilen: a.ertrag, leer: 'Kein Ertrag im Zeitraum',
+          spalten: [{ titel: 'Konto', wert: konto }, { titel: 'Netto', klasse: 'num', wert: (x) => chf(x.nettoChf) }],
+          fuss: a.ertrag.length ? html`<tr><td>Total</td><td class="num">${chf(summe(a.ertrag, 'nettoChf'))}</td></tr>` : '',
+        }) })}
+        ${sektion({ titel: 'Ertrag je Konto und Kunde', flush: true, inhalt: tabelle({
+          zeilen: a.ertragJeAuftraggeber, leer: 'Kein Ertrag im Zeitraum',
+          spalten: [
+            { titel: 'Konto', klasse: 'nowrap', wert: (x) => x.kontoNummer ?? '–' },
+            { titel: 'Kunde', wert: (x) => html`<a class="bbz-link" href="#/finanzen/rechnungen?auftraggeberId=${x.auftraggeberId}">${x.auftraggeber}</a>` },
+            { titel: 'Netto', klasse: 'num', wert: (x) => chf(x.nettoChf) },
+          ],
+        }) })}
+      </div>
+      ${sektion({ titel: 'Aufwand (Honorare) je Konto', flush: true, inhalt: tabelle({
+        zeilen: a.aufwand, leer: 'Keine Honorare im Zeitraum',
+        spalten: [{ titel: 'Konto', wert: konto }, { titel: 'Honorare', klasse: 'num', wert: (x) => chf(x.honorarChf) }],
+      }) })}
+    </div>`);
+  ctx.aenderung('zeitraum', () => {
+    const w = formWerte(ctx.el.querySelector('form[data-form=zeitraum]'));
+    ctx.navigiere(`/finanzen/auswertung?${new URLSearchParams(ohneLeere(w))}`);
+  });
+  ctx.formular('zeitraum', () => undefined);
 }

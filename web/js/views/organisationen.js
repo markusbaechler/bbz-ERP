@@ -57,7 +57,7 @@ export async function liste(ctx) {
 
 export async function detail(ctx) {
   const id = ctx.params.id;
-  const [o, ma] = await Promise.all([get(`/organisation/${id}`), store.mitarbeitende()]);
+  const [o, ma, anmeldungen] = await Promise.all([get(`/organisation/${id}`), store.mitarbeitende(), get('/anmeldung', { organisationId: id })]);
   const maMap = store.nachId(ma);
   const saldo = o.auftraggeber ? await get(`/auftraggeber/${o.auftraggeber.id}/saldo`) : null;
   const kontaktMap = store.nachId(o.kontakte);
@@ -86,6 +86,19 @@ export async function detail(ctx) {
               { titel: 'Funktion', wert: (k) => k.funktion ?? '–' },
               { titel: 'E-Mail', wert: (k) => (k.email ? html`<a href="mailto:${k.email}">${k.email}</a>` : '–') },
               { titel: 'Telefon', klasse: 'nowrap', wert: (k) => k.telefon ?? k.mobile ?? '–' },
+            ],
+          }),
+        })}
+        ${sektion({
+          titel: `Kursanmeldungen (${anmeldungen.length})`, untertitel: 'Mitarbeitende dieser Organisation über alle Kurse', flush: true, testid: 'org-anmeldungen',
+          inhalt: tabelle({
+            zeilen: [...anmeldungen].sort((a, b) => (b.startDatum ?? '').localeCompare(a.startDatum ?? '')), leer: 'Keine Kursanmeldungen',
+            href: (a) => `#/bildung/durchfuehrung/${a.durchfuehrungId}`, beschriftung: 'Kursanmeldungen',
+            spalten: [
+              { titel: 'Beginn', klasse: 'nowrap', wert: (a) => datum(a.startDatum) },
+              { titel: 'Kurs', wert: (a) => html`<a class="bbz-link" href="#/bildung/durchfuehrung/${a.durchfuehrungId}">${a.durchfuehrungTitel ?? a.durchfuehrungCode ?? '–'}</a>${a.durchfuehrungCode ? html`<div class="bbz-small bbz-muted">${a.durchfuehrungCode}</div>` : ''}` },
+              { titel: 'Person', wert: (a) => html`<a class="bbz-link" href="#/crm/kontakt/${a.kontaktId}">${a.kontaktName}</a>` },
+              { titel: 'Status', wert: (a) => statusChip('anmeldeStatus', a.status) },
             ],
           }),
         })}
