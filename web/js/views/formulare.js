@@ -182,12 +182,14 @@ export async function verkaufschanceFormular(vc = null, vor = {}) {
 
 /** Gewonnene Chance -> Projekt beim Debitor der Organisation (Stammnummer.Jahr). */
 export async function projektEroeffnen(vc) {
+  const konten = await store.ertragskontoOptionen();
   return formModal({
     titel: `Projekt eröffnen: ${vc.titel}`, submitText: 'Projekt eröffnen', testid: 'projekt-eroeffnen',
     felder: formGrid(
       feld({ name: 'stammnummer', label: 'Stammnummer', typ: 'number', pflicht: true, attr: { min: 1, max: 9999, step: 1 }, hint: 'Projektnummer = Stammnummer.Jahr (z. B. 6231.26)' }),
       feld({ name: 'jahr', label: 'Jahr', typ: 'number', pflicht: true, wert: Number(heute().slice(0, 4)), attr: { min: 2000, max: 2100, step: 1 } }),
       feld({ name: 'name', label: 'Projektname', wert: vc.titel, span2: true }),
+      konten.length ? feld({ name: 'ertragskontoId', label: 'Ertragskonto (Kontierung)', typ: 'select', optionen: konten, leerOption: '– ohne –', span2: true }) : '',
     ),
     onSubmit: (w) => post(`/verkaufschance/${vc.id}/projekt`, ohneLeere(w)),
   });

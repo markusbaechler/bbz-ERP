@@ -74,3 +74,8 @@ export async function kontokorrentSaldo(pool: pg.Pool, auftraggeberId: string): 
   const posten = await offenePosten(pool, { auftraggeberId });
   return rappenRunden(posten.reduce((s, p) => s + p.offen, 0));
 }
+
+export async function listZahlungen(pool: pg.Pool, rechnungId: string): Promise<Zahlungseingang[]> {
+  const r = await pool.query('select * from zahlungseingang where rechnung_id=$1 order by datum, erstellt_am', [rechnungId]);
+  return r.rows.map(mapZ);
+}

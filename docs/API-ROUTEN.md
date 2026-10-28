@@ -1,6 +1,6 @@
 # API-Routen (generiert)
 
-Stand: 2026-10-28 · 158 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
+Stand: 2026-10-28 · 164 Routen · erzeugt mit `npm run api:routen`. Fachliche Beschreibung: Spec v2 §5–§6.
 
 ## Administration & Integration
 
@@ -33,6 +33,11 @@ Stand: 2026-10-28 · 158 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `GET` | `/` |
 | `GET` | `/app` |
 | `GET` | `/health` |
+| `GET` | `/konto` |
+| `POST` | `/konto` |
+| `GET` | `/me` |
+| `GET` | `/mwst-satz` |
+| `POST` | `/mwst-satz` |
 
 ## Bildung
 
@@ -119,6 +124,7 @@ Stand: 2026-10-28 · 158 Routen · erzeugt mit `npm run api:routen`. Fachliche B
 | `POST` | `/rechnung/:id/position` |
 | `POST` | `/rechnung/:id/stornieren` |
 | `POST` | `/rechnung/:id/zahlung` |
+| `GET` | `/rechnung/:id/zahlungen` |
 
 ## Homepage (oeffentlich, API-Schluessel)
 

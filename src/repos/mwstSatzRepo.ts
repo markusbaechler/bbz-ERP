@@ -24,3 +24,11 @@ export async function findGueltigenSatz(pool: pg.Pool, satz: number, datum: stri
   if (!r.rowCount) throw new NotFoundError(`Kein MWSt-Satz ${satz} gültig am ${datum}`);
   return map(r.rows[0]);
 }
+
+/** Saetze, optional nur die an einem Stichtag gueltigen (fuer Auswahllisten). */
+export async function listMwstSaetze(pool: pg.Pool, opts: { gueltigAm?: string } = {}): Promise<MwstSatz[]> {
+  const r = opts.gueltigAm
+    ? await pool.query('select * from mwst_satz where gueltig_ab<=$1 and (gueltig_bis is null or gueltig_bis>=$1) order by satz desc', [opts.gueltigAm])
+    : await pool.query('select * from mwst_satz order by gueltig_ab desc, satz desc');
+  return r.rows.map(map);
+}

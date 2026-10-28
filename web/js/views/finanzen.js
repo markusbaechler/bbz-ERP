@@ -13,7 +13,6 @@ const finanzTabs = (aktiv) => tabs([
   { href: '#/finanzen/mahnwesen', label: 'Mahnwesen', aktiv: aktiv === 'mahnwesen' },
 ], 'Finanzen');
 const ZAHLUNGSFRIST = 30;
-const MWST = [['8.1', '8.1 %'], ['2.6', '2.6 %'], ['3.8', '3.8 %'], ['0', '0 %']];
 const STUFE = { 1: 'Erinnerung', 2: '2. Mahnung', 3: '3. Mahnung' };
 /** Route /rechnung/:id/mahnungen fehlt auf dem Server (Modul nicht ausgerollt): nicht bei jedem Rendern erneut anfragen. */
 let mahnungenFehlen = false;
@@ -127,6 +126,7 @@ export async function rechnung(ctx) {
   const fertig = (m) => { toast(m, 'success'); ctx.neu(); };
   ctx.aktion('pdf', () => herunterladen(`/rechnung/${id}/pdf`, { dateiname: `rechnung-${r.nummer ?? 'entwurf'}.pdf`.replace(/\s+/g, ''), oeffnen: true }));
   ctx.aktion('position', async () => {
+    const MWST = await store.mwstOptionen();
     const x = await formModal({
       titel: 'Position hinzufügen',
       felder: formGrid(

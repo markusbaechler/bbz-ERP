@@ -12,9 +12,9 @@ export const bildungTabs = (aktiv) => tabs([
   { href: '#/bildung/rezertifizierung', label: 'Rezertifizierung fällig', aktiv: aktiv === 'rezertifizierung' },
 ], 'Bildung');
 
-const MWST = [['0', '0 % (Bildung, ausgenommen)'], ['8.1', '8.1 % Normalsatz'], ['2.6', '2.6 % reduziert'], ['3.8', '3.8 % Beherbergung']];
 
 async function kursFormular(k = null) {
+  const MWST = await store.mwstOptionen();
   const a = k ?? {};
   return formModal({
     titel: k ? `Kursangebot ${a.code} bearbeiten` : 'Kursangebot erfassen', breit: true, testid: 'kurs-form',

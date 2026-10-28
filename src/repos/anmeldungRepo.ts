@@ -319,15 +319,16 @@ export async function updateAnmeldung(db: Db, id: string, patch: { rechnungsempf
   return mapAnmeldung(r.rows[0]);
 }
 
-export async function listAnmeldungen(db: Db, filter: { durchfuehrungId?: string; kontaktId?: string; status?: string } = {}): Promise<Anmeldung[]> {
+export async function listAnmeldungen(db: Db, filter: { durchfuehrungId?: string; kontaktId?: string; status?: string } = {}): Promise<(Anmeldung & { kontaktName: string })[]> {
   const cond: string[] = []; const args: unknown[] = [];
   const add = (sql: string, v: unknown) => { args.push(v); cond.push(sql.replace('?', `$${args.length}`)); };
   if (filter.durchfuehrungId) add('durchfuehrung_id=?', filter.durchfuehrungId);
   if (filter.kontaktId) add('kontakt_id=?', filter.kontaktId);
   if (filter.status) add('status = any(?)', filter.status.split(',').map((s) => s.trim()));
   const r = await db.query(
-    `select * from anmeldung ${cond.length ? 'where ' + cond.join(' and ') : ''} order by angemeldet_am, id`, args);
-  return r.rows.map(mapAnmeldung);
+    `select a.*, k.vorname as kontakt_vorname, k.nachname as kontakt_nachname from anmeldung a join kontakt k on k.id=a.kontakt_id
+     ${cond.length ? 'where ' + cond.map((c) => 'a.' + c).join(' and ') : ''} order by a.angemeldet_am, a.id`, args);
+  return r.rows.map((x: any) => ({ ...mapAnmeldung(x), kontaktName: [x.kontakt_vorname, x.kontakt_nachname].filter(Boolean).join(' ') }));
 }
 
 export type TeilnehmerZeile = {

@@ -14,7 +14,6 @@ const UEBERGAENGE = {
   abgeschlossen: ['archiviert', 'laufend'], abgesagt: [], archiviert: [],
 };
 const SPALTEN = ['offen', 'in_arbeit', 'review', 'erledigt'];
-const MWST = [[8.1, '8.1 % Normalsatz'], [2.6, '2.6 % reduziert'], [3.8, '3.8 % Beherbergung'], [0, '0 % ausgenommen']];
 
 const TABS = [
   ['uebersicht', 'Übersicht'], ['aufgaben', 'Aufgaben'], ['gantt', 'Gantt'], ['phasen', 'Phasen & Meilensteine'],
@@ -329,13 +328,14 @@ const TAB_RENDER = {
     const [rechnungen, cockpit] = await Promise.all([get('/rechnung', { projektId: id }), get(`/projekt/${id}/cockpit`)]);
     const entwuerfe = rechnungen.filter((r) => ['offen_prov', 'def_vereinbart'].includes(r.status));
     ctx.aktion('zeit-verrechnen', async () => {
+      const MWST = await store.mwstOptionen();
       const r = await formModal({
         titel: 'Zeit verrechnen', submitText: 'Rechnungsentwurf erstellen', testid: 'zeit-verrechnen',
         felder: formGrid(
           html`<p class="bbz-span-2 bbz-small bbz-muted">Alle verrechenbaren, noch nicht verrechneten Zeiteinträge (optional bis Stichtag) werden in einer Transaktion auf einen Rechnungsentwurf gebucht. Aktuell unverrechnet: <strong>${chf(cockpit.unverrechnetChf)}</strong>.</p>`,
           feld({ name: 'datum', label: 'Rechnungsdatum', typ: 'date', wert: heute(), pflicht: true }),
           feld({ name: 'bis', label: 'Leistungen bis', typ: 'date', hint: 'leer = alle' }),
-          feld({ name: 'mwstSatz', label: 'MWSt-Satz', typ: 'select', optionen: MWST.map(([s, l]) => [String(s), l]), wert: '8.1' }),
+          feld({ name: 'mwstSatz', label: 'MWSt-Satz', typ: 'select', optionen: MWST, wert: '8.1' }),
           feld({ name: 'gruppierung', label: 'Positionen', typ: 'select', optionen: [['mitarbeitende', 'je Person'], ['taetigkeit', 'je Tätigkeit'], ['einzeln', 'je Eintrag']], wert: 'mitarbeitende' }),
           feld({ name: 'rechnungId', label: 'Auf bestehenden Entwurf buchen', typ: 'select', optionen: entwuerfe.map((x) => [x.id, `${datum(x.datum)} · ${chf(x.totalBrutto)}`]), leerOption: '– neuer Entwurf –', span2: true }),
         ),

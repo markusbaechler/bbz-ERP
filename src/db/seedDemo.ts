@@ -27,6 +27,7 @@ import { createKursangebot } from '../repos/kursangebotRepo';
 import { createDurchfuehrung, setDurchfuehrungStatus, referentZuweisen } from '../repos/durchfuehrungRepo';
 import { meldeAn, bestaetigeAnmeldung, setzeTeilnahme, storniereAnmeldung } from '../repos/anmeldungRepo';
 import { createZertifizierung, createLernnachweis } from '../repos/lernnachweisRepo';
+import { createSaqFall, planePruefung, erfasseResultat, setzeArbeitgeberbestaetigung, stelleZertifikatAus } from '../repos/saqRepo';
 import { festschreiben } from '../repos/rechnungRepo';
 import { erfasseZahlung } from '../repos/debitorRepo';
 import { createApiClient } from '../repos/apiClientRepo';
@@ -270,6 +271,28 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
   await createZertifizierung(pool, { kontaktId: claudia.id, typ: 'SAQ Kundenberater Bank (PK)', zertifikatNr: 'SAQ-PK-DEMO-001', ausgestelltAm: tag(-32 * 30), gueltigBis: tag(110) });
   await createZertifizierung(pool, { kontaktId: eva.id, typ: 'SAQ Kundenberater Bank (IK)', zertifikatNr: 'SAQ-IK-DEMO-002', ausgestelltAm: tag(-300) });
 
+  // --- SAQ-Vorgaenge: zertifiziert, schriftlich bestanden mit Wiederholung, frisch angemeldet ------------
+  const saqOliver = await createSaqFall(pool, { kontaktId: oliver.id, organisationId: beispielsee.org.id, rechnungsempfaengerId: beispielsee.ag.id,
+    profil: 'IK', umfang: 'gesamtpaket', sprache: 'DE', rolle: 'Kundenberater', einwilligungRechnungBank: true }, 'sk');
+  const weOliver = await planePruefung(pool, saqOliver.id, { art: 'schriftlich', teil: 1, datum: tag(-90), ort: 'Zürich' }, 'sk');
+  await erfasseResultat(pool, weOliver.id, { resultatProzent: 82 }, 'sk');
+  await setzeArbeitgeberbestaetigung(pool, saqOliver.id, tag(-80), 'sk');
+  const oeOliver = await planePruefung(pool, saqOliver.id, { art: 'muendlich', teil: 1, datum: tag(-45), ort: 'St. Gallen', experte1Id: refExtern.id, experte2Id: refIntern.id }, 'sk');
+  await erfasseResultat(pool, oeOliver.id, { resultatProzent: 76 }, 'sk');
+  await stelleZertifikatAus(pool, saqOliver.id, { zertifikatNr: 'SAQ-IK-DEMO-003', ausgestelltAm: tag(-40) }, 'sk');
+
+  const saqNina = await createSaqFall(pool, { kontaktId: nina.id, organisationId: musterbank.org.id, rechnungsempfaengerId: musterbank.ag.id,
+    profil: 'AFFL', umfang: 'gesamtpaket', sprache: 'DE', rolle: 'Kundenberaterin', einwilligungRechnungBank: true }, 'sk');
+  const we1Nina = await planePruefung(pool, saqNina.id, { art: 'schriftlich', teil: 1, datum: tag(-70), ort: 'Zürich' }, 'sk');
+  await erfasseResultat(pool, we1Nina.id, { resultatProzent: 74 }, 'sk');
+  const we2Nina = await planePruefung(pool, saqNina.id, { art: 'schriftlich', teil: 2, datum: tag(-70), ort: 'Zürich' }, 'sk');
+  await erfasseResultat(pool, we2Nina.id, { resultatProzent: 61 }, 'sk');
+  await planePruefung(pool, saqNina.id, { art: 'schriftlich', teil: 2, datum: werktag(42), ort: 'Zürich' }, 'sk');
+
+  await createSaqFall(pool, { kontaktId: claudia.id, organisationId: musterbank.org.id, rechnungsempfaengerId: musterbank.ag.id,
+    profil: 'AFFL', variante: 'erstzertifizierung', umfang: 'gesamtpaket', sprache: 'DE', rolle: 'Kundenberaterin', einwilligungRechnungBank: true,
+    bemerkung: 'Aufstieg von PK (Zertifikat laeuft bald ab)' }, 'sk');
+
   // --- Rechnungen: festgeschrieben mit Teilzahlung (ueberfaellig), bezahlt, Entwurf -----------------
   const r1 = await zeitVerrechnen(pool, p1.id, { datum: tag(-40), bis: tag(-41), mwstSatz: 8.1, gruppierung: 'mitarbeitende' }, { benutzer: 'ml' });
   await festschreiben(pool, r1.rechnung.id, 'ml');
@@ -282,7 +305,7 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
   // --- Integration: API-Client fuer die Homepage (Schluessel wird nicht ausgegeben) ------------------
   await createApiClient(pool, { name: 'Homepage (Demo)', scopes: ['public:read', 'public:anmeldung', 'public:anfrage'], erlaubteOrigins: ['https://www.example.ch'] });
 
-  log(`Demo-Daten angelegt (Stichtag ${HEUTE}): 3 Mitarbeitende, 7 Organisationen, 16 Kontakte, 4 Projekte, 3 Kursangebote, 4 Durchfuehrungen, 3 Rechnungen.`);
+  log(`Demo-Daten angelegt (Stichtag ${HEUTE}): 3 Mitarbeitende, 7 Organisationen, 16 Kontakte, 4 Projekte, 3 Kursangebote, 4 Durchfuehrungen, 3 SAQ-Vorgaenge, 3 Rechnungen.`);
   log('Anmeldung im Dev-Modus z. B. als ml (Admin) oder ph/sk (Standard).');
   return true;
 }

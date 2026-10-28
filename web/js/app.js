@@ -57,13 +57,11 @@ const GLOBAL_FORM = {
 };
 
 async function entraPerson(st) {
-  const liste = await get('/mitarbeitende', { aktiv: 'true' });
-  const ma = liste.find((m) => (m.email ?? '').toLowerCase() === st.email);
+  // Der Server ordnet das Token zu (oid/E-Mail) und liefert die wirksame Rolle.
+  const me = await get('/me');
+  const ma = me.mitarbeitende;
   if (!ma) throw new Error(`Für ${st.email} ist kein aktives bbz-Konto (Mitarbeitende) erfasst.`);
-  auth.setzeSitzung({
-    kuerzel: ma.kuerzel, rolle: ma.rolle === 'admin' || st.roles.includes('bbz.admin') ? 'admin' : 'standard',
-    name: personName(ma), mitarbeitendeId: ma.id, email: ma.email,
-  });
+  auth.setzeSitzung({ kuerzel: ma.kuerzel, rolle: me.rolle, name: personName(ma), mitarbeitendeId: ma.id, email: ma.email });
 }
 
 /* ---------- Shell ---------- */

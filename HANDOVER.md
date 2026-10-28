@@ -34,12 +34,15 @@ TypeScript · Fastify 4 · PostgreSQL 16 (`pg`) · vitest · Vanilla-JS-PWA (`we
 ```bash
 docker compose up -d          # Postgres auf localhost:5433 (bbz/bbz)
 npm install
-npm test                      # alle Suiten (DB noetig); Browser-Test des Widgets laeuft nur mit installiertem Playwright
+npm test                      # 67 Suiten / 489 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
 npx tsc --noEmit
 npm run migrate && npm run seed:demo
 npm run dev                   # http://localhost:3000/app/
 npm run worker                # Outbox (Moodle, Webhooks, Mail)
+DATABASE_URL=postgres://bbz:bbz@localhost:5433/bbz_e2e npm run test:e2e   # Browser-Rundgang (42 Pruefungen, Screenshots)
 ```
+- `seed:demo` legt nur synthetische Daten an (`*.example`-Domains) und bricht ohne Aenderung ab, wenn die Demo-Mitarbeitenden (ml/ph/sk) schon existieren.
+- `test:e2e` verweigert DB-Namen ohne `test`/`web`/`e2e`/`demo` im Namen, weil es die Datenbank neu aufsetzt.
 Wichtige Umgebungsvariablen: `.env.example`.
 - In Produktion (`NODE_ENV=production`) ist `AUTH_MODE=dev` **gesperrt**; dort gilt `AUTH_MODE=entra`.
 
@@ -64,7 +67,7 @@ Wichtige Umgebungsvariablen: `.env.example`.
 | Integration | `routes/public.ts`, `publicSchutz.ts`, `integrations/{formulare,webhooks,mail,mailVorlagen,worker}.ts`, `integrations/moodle/*`, `routes/integration.ts`, `widget/bbz-kurse.js` | ✅ |
 | Auth | `authHook.ts` (dev/entra) | ✅ |
 | Migration | `tools/fm-analyse` (DDR), `tools/fm-import` (Daten), `tools/kuba-import` (SAQ-Historie aus Reporting_KUBA.xlsx, `docs/analyse/KUBA-IMPORT.md`) | ✅ |
-| Frontend | `web/` (PWA unter `/app/`) | siehe unten |
+| Frontend | `web/` (Vanilla-JS-PWA unter `/app/`, ohne Build): Cockpit, CRM (Pipeline, 360°), Projekte (Gantt, Kanban), Zeit, Bildung, SAQ (inkl. KUBA-Export), Finanzen, Ressourcen-Heatmap, Admin; Stammdaten via `routes/stammdaten.ts` (`/me`, `/konto`, `/mwst-satz`) | ✅ (E2E `test/e2e/smoke.mjs`) |
 
 ## Sicherheit (Review 28.10.2026, alle Befunde behoben, Tests: `test/sicherheit.test.ts`)
 - Die öffentliche API läuft pro Request auf **einer** DB-Verbindung (Idempotenz-Sperre + Fachlogik + Savepoint). Pool-Timeouts sind gesetzt (`PG_*`).
