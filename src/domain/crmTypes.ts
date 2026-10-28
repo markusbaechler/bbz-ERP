@@ -1,4 +1,5 @@
 /** Typen des CRM-Moduls (Spec v2 §5.2). JSON in camelCase, Datum 'YYYY-MM-DD', Zeitpunkte ISO-8601. */
+import type { Kontakt, Auftraggeber } from './types';
 
 export type OrganisationKategorie = 'kunde' | 'interessent' | 'partner' | 'lieferant' | 'uebrige';
 export type Klassifizierung = 'A' | 'B' | 'C' | 'akquisition';
@@ -66,4 +67,53 @@ export type Wiedervorlagen<T> = { ueberfaellig: T[]; dieseWoche: T[]; spaeter: T
 
 export type NewsletterEmpfaenger = {
   email: string; anrede: string | null; vorname: string | null; nachname: string; organisation: string | null;
+};
+
+/* ---------- 360°-Sichten und Dashboard ---------- */
+
+export type ProjektKurz = {
+  id: string; nummer: string; name: string; jahr: number; status: string; bereich: string | null; auftraggeberId: string;
+};
+
+export type Organisation360 = Organisation & {
+  kontakte: Kontakt[];
+  /** Letzte 20 Aktivitaeten (direkt oder an Kontakten der Organisation). */
+  aktivitaeten: Aktivitaet[];
+  offeneAufgaben: CrmAufgabe[];
+  verkaufschancen: Verkaufschance[];
+  projekte: ProjektKurz[];
+  auftraggeber: Auftraggeber | null;
+  /** Festgeschriebene Rechnungen (abgerechnet/bezahlt), Summe netto je Rechnungsjahr, neuestes zuerst. */
+  umsatzProJahr: { jahr: number; nettoChf: number }[];
+};
+
+export type AnmeldungKurz = {
+  id: string; durchfuehrungId: string; durchfuehrungCode: string | null; titel: string; startDatum: string; endDatum: string;
+  status: string; preisChf: number | null; angemeldetAm: string;
+};
+export type LernnachweisKurz = {
+  id: string; anmeldungId: string | null; datum: string; titel: string; lernstunden: number; kategorie: string; quelle: string;
+};
+export type ZertifizierungKurz = {
+  id: string; typ: string; zertifikatNr: string | null; ausgestelltAm: string; gueltigBis: string; status: string;
+};
+
+export type Kontakt360 = Kontakt & {
+  organisation: Organisation | null;
+  aktivitaeten: Aktivitaet[];
+  aufgaben: CrmAufgabe[];
+  verkaufschancen: Verkaufschance[];
+  anmeldungen: AnmeldungKurz[];
+  lernnachweise: LernnachweisKurz[];
+  zertifizierungen: ZertifizierungKurz[];
+};
+
+export type CrmDashboard = {
+  stichtag: string;
+  neueAnfragen: { anzahl: number; neueste: Anfrage[] };
+  wiedervorlagen: { ueberfaellig: number; dieseWoche: number; spaeter: number; ohneTermin: number };
+  /** Offene Pipeline (gewichtet). */
+  pipeline: PipelineSumme;
+  aktivitaeten30Tage: { anzahl: number; jeTyp: Partial<Record<AktivitaetTyp, number>> };
+  pflegeabdeckung: PflegeabdeckungZeile[];
 };
