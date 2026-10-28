@@ -13,6 +13,7 @@ import {
   teilnehmerliste, type TeilnehmerZeile,
 } from '../../repos/anmeldungRepo';
 import { verrechneDurchfuehrung, OhneRechnungsempfaengerError } from '../../repos/bildungVerrechnungRepo';
+import { sammelrechnungVorschau, verrechneSammelrechnung } from '../../repos/sammelrechnungRepo';
 import {
   createLernnachweis, listLernnachweise, createZertifizierung, getZertifizierung, listZertifizierungen,
   getRezertifizierung, listFaelligeRezertifizierungen,
@@ -135,6 +136,18 @@ export function registerBildungRoutes(app: FastifyInstance, pool: pg.Pool): void
   app.post('/durchfuehrung/:id/verrechnen', { preHandler: requireAdmin }, async (req, reply) => {
     try {
       const res = await verrechneDurchfuehrung(pool, id(req), (req.body ?? {}) as any, req.benutzer);
+      return reply.code(res.rechnungen.length ? 201 : 200).send(res);
+    } catch (e) { return fehler(reply, e); }
+  });
+  // Sammelrechnung je Bank ueber alle Kurse eines Zeitraums (FileMaker "Halbjahresrechnung")
+  app.get('/verrechnung/sammelrechnung', { preHandler: requireAdmin }, async (req, reply) => {
+    const q = req.query as any;
+    try { return await sammelrechnungVorschau(pool, { von: q.von, bis: q.bis, auftraggeberId: q.auftraggeberId }); }
+    catch (e) { return fehler(reply, e); }
+  });
+  app.post('/verrechnung/sammelrechnung', { preHandler: requireAdmin }, async (req, reply) => {
+    try {
+      const res = await verrechneSammelrechnung(pool, (req.body ?? {}) as any, req.benutzer);
       return reply.code(res.rechnungen.length ? 201 : 200).send(res);
     } catch (e) { return fehler(reply, e); }
   });

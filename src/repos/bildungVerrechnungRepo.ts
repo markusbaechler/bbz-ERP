@@ -26,6 +26,19 @@ type Offen = {
   gebuehrChf: number | null; referenz: string | null; name: string;
 };
 
+/** Positionstext-Stamm einer Durchfuehrung ("Kurs <Titel> <Code>"), auch fuer die Sammelrechnung. */
+export const kursText = (d: { titel: string | null; kursangebotTitel: string; code: string | null }): string =>
+  `Kurs ${d.titel ?? d.kursangebotTitel} ${d.code}`;
+
+/** Nebenkosten (Verpflegung/Infrastruktur) je Teilnehmer:in und Kurstag mit eigenem MWSt-Satz (AGB: separat ausgewiesen). */
+export async function nebenkostenFuer(c: Db, durchfuehrungId: string): Promise<{ proTag: number; mwstSatz: number; tage: number } | null> {
+  const nk = (await c.query(
+    `select ka.nebenkosten_pro_tag_chf as satz, ka.nebenkosten_mwst_satz as mwst,
+            greatest((select count(*) from kurstag t where t.durchfuehrung_id=d.id), 1)::int as tage
+     from durchfuehrung d join kursangebot ka on ka.id=d.kursangebot_id where d.id=$1`, [durchfuehrungId])).rows[0];
+  return nk?.satz !== null && Number(nk?.satz) > 0 ? { proTag: Number(nk.satz), mwstSatz: Number(nk.mwst), tage: Number(nk.tage) } : null;
+}
+
 /**
  * Verrechnungslauf einer Durchfuehrung (Admin), atomar in einer Transaktion:
  * - Standard: je Rechnungsempfaenger ein Rechnungsentwurf im Projekt der Durchfuehrung; je Teilnehmer:in eine Position
@@ -45,16 +58,10 @@ export async function verrechneDurchfuehrung(db: Db, durchfuehrungId: string, in
     if (!d.projektId) throw new ValidationError(`Durchfuehrung ${d.code} hat kein Projekt (Kostentraeger) fuer die Verrechnung`);
     if (pauschal !== null && !d.auftraggeberId) throw new ValidationError('Pauschale verlangt einen Auftraggeber der Durchfuehrung (Firmenkurs)');
     const projekt = await getProjektById(c, d.projektId);
-    const kurs = `Kurs ${d.titel ?? d.kursangebotTitel} ${d.code}`;
+    const kurs = kursText(d);
     const position = (beschreibung: string, einzelpreis: number) =>
       ({ beschreibung, menge: 1, einheit: 'Pauschal', einzelpreis, mwstSatz: d.mwstSatz, kontoId: d.ertragskontoId });
-    // Nebenkosten (Verpflegung/Infrastruktur) je Teilnehmer:in und Kurstag, eigener MWSt-Satz (AGB: separat ausgewiesen)
-    const nk = (await c.query(
-      `select ka.nebenkosten_pro_tag_chf as satz, ka.nebenkosten_mwst_satz as mwst,
-              greatest((select count(*) from kurstag t where t.durchfuehrung_id=d.id), 1)::int as tage
-       from durchfuehrung d join kursangebot ka on ka.id=d.kursangebot_id where d.id=$1`, [d.id])).rows[0];
-    const nebenkosten = nk?.satz !== null && Number(nk?.satz) > 0
-      ? { proTag: Number(nk.satz), mwstSatz: Number(nk.mwst), tage: Number(nk.tage) } : null;
+    const nebenkosten = await nebenkostenFuer(c, d.id);
     const neueRechnung = (auftraggeberId: string) =>
       createRechnung(c, { projektId: projekt.id, auftraggeberId, datum, betreff: kurs, mwstModus: projekt.mwstModus });
 
