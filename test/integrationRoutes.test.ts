@@ -73,9 +73,32 @@ describe('Public-Schutz-Bausteine', () => {
     const c = await pool.query(`insert into api_client(name,key_prefix,key_hash) values ('t','bbz_00000000','x') returning id`);
     let n = 0;
     const fn = async () => { n++; await new Promise((r) => setTimeout(r, 30)); return { status: 201, body: { nr: n } }; };
-    const [a, b] = await Promise.all([mitIdempotenz(pool, c.rows[0].id, 'k1', fn), mitIdempotenz(pool, c.rows[0].id, 'k1', fn)]);
+    const fehler = (e: unknown) => { throw e; };
+    const [a, b] = await Promise.all([mitIdempotenz(pool, c.rows[0].id, 'k1', fn, fehler), mitIdempotenz(pool, c.rows[0].id, 'k1', fn, fehler)]);
     expect(n).toBe(1);
     expect(a.body).toEqual(b.body);
     expect([a.wiederholt, b.wiederholt].sort()).toEqual([false, true]);
+  });
+  it('kein Pool-Deadlock: Fachlogik laeuft auf der Verbindung mit der Sperre (Security-Review Befund 1)', async () => {
+    const pg = await import('pg');
+    const klein = new pg.default.Pool({ connectionString: process.env.DATABASE_URL, max: 2, connectionTimeoutMillis: 3000 });
+    try {
+      const c = await klein.query(`insert into api_client(name,key_prefix,key_hash) values ('d','bbz_00000001','x') returning id`);
+      const laeufe = Array.from({ length: 8 }, (_, i) => mitIdempotenz(klein, c.rows[0].id, `k-${i}`,
+        async (cl) => { await cl.query('select pg_sleep(0.02)'); return { status: 201, body: { i } }; }, (e) => { throw e; }));
+      const r = await Promise.all(laeufe);
+      expect(r.map((x) => x.status)).toEqual(Array(8).fill(201));
+    } finally { await klein.end(); }
+  });
+  it('Fachfehler werden am Savepoint zurueckgerollt und als Antwort gespeichert', async () => {
+    const c = await pool.query(`insert into api_client(name,key_prefix,key_hash) values ('s','bbz_00000002','x') returning id`);
+    const r = await mitIdempotenz(pool, c.rows[0].id, 'f1', async (cl) => {
+      await cl.query(`insert into webhook_abo(name,url,secret,ereignisse) values ('weg','https://x.ch','s','{*}')`);
+      throw new Error('fachlich');
+    }, () => ({ status: 409, body: { error: 'Konflikt' } }));
+    expect(r.status).toBe(409);
+    expect((await pool.query(`select 1 from webhook_abo where name='weg'`)).rowCount).toBe(0);
+    const w = await mitIdempotenz(pool, c.rows[0].id, 'f1', async () => ({ status: 201, body: {} }), (e) => { throw e; });
+    expect(w).toMatchObject({ status: 409, wiederholt: true });
   });
 });

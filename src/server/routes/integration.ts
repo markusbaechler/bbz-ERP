@@ -9,7 +9,7 @@ import { standardHandler, verarbeiteOutbox, type WorkerDeps } from '../../integr
 import { MoodleFehler } from '../../integrations/moodle/client';
 import { abschlussSync } from '../../integrations/moodle/sync';
 import { importiereBuchungen, liesBuchungenCsv, type MoodleBuchung } from '../../integrations/moodle/buchungen';
-import { pruefeSignatur } from '../../integrations/webhooks';
+import { pruefeSignatur, pruefeWebhookUrlSyntax } from '../../integrations/webhooks';
 import { markiereAbgeschlossen } from '../../repos/anmeldungRepo';
 import { findeDurchfuehrungPerMoodleSession, anmeldungenZuMoodleAbschluss } from '../../repos/zuordnungRepo';
 import { ValidationError } from '../../domain/errors';
@@ -44,7 +44,7 @@ export function registerIntegrationRoutes(app: FastifyInstance, pool: pg.Pool, d
     try {
       const b = req.body as { name?: string; url?: string; ereignisse?: string[] };
       if (!b?.name?.trim()) throw new ValidationError('name ist Pflicht');
-      if (!b.url || !/^https:\/\/[^\s]+$/.test(b.url)) throw new ValidationError('url muss mit https:// beginnen');
+      try { pruefeWebhookUrlSyntax(b.url ?? ''); } catch (e) { throw new ValidationError((e as Error).message); }
       const unbekannt = (b.ereignisse ?? []).filter((x) => !EREIGNISSE.includes(x));
       if (!b.ereignisse?.length || unbekannt.length) throw new ValidationError(`ereignisse aus: ${EREIGNISSE.join(', ')}`);
       const secret = randomBytes(24).toString('base64url');

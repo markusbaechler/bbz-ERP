@@ -7,7 +7,14 @@ pg.types.setTypeParser(1082, (v: string) => v);
 let pool: pg.Pool | undefined;
 
 export function getPool(): pg.Pool {
-  if (!pool) pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  // Timeouts: eine haengende Verbindung darf den Pool nicht dauerhaft blockieren (Security-Review Befund 1)
+  if (!pool) pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: Number(process.env.PG_POOL_MAX ?? 10),
+    connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS ?? 10_000),
+    idle_in_transaction_session_timeout: Number(process.env.PG_IDLE_IN_TX_TIMEOUT_MS ?? 30_000),
+    statement_timeout: Number(process.env.PG_STATEMENT_TIMEOUT_MS ?? 60_000),
+  });
   return pool;
 }
 

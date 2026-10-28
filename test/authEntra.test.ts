@@ -65,3 +65,11 @@ describe('Entra-ID-Auth', () => {
     expect(authKonfigAusEnv({ AUTH_MODE: 'entra', ENTRA_TENANT_ID: 't', ENTRA_AUDIENCE: 'a' })).toMatchObject({ modus: 'entra', adminRolle: 'bbz.admin' });
   });
 });
+
+describe('Entra-ID: oid-Bindung (Security-Review Befund 5)', () => {
+  it('ein gebundenes Konto kann nicht ueber gleiche E-Mail mit anderer oid uebernommen werden', async () => {
+    await createMitarbeitende(pool, { kuerzel: 'gb', nachname: 'Gebunden', email: 'gb@bbz.test', rolle: 'admin', entraOid: 'oid-gb' });
+    expect((await get('/admin/ping', await token({ oid: 'oid-fremd', preferred_username: 'gb@bbz.test' }))).statusCode).toBe(403);
+    expect((await get('/admin/ping', await token({ oid: 'oid-gb' }))).statusCode).toBe(200);
+  });
+});

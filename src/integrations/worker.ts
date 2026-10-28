@@ -10,7 +10,9 @@ export type Handler = (e: OutboxEintrag) => Promise<unknown>;
 
 export type WorkerDeps = { moodle: MoodleClient | null; mail: MailAdapter; fetch?: typeof fetch; moodleTiming?: MoodleTiming;
   /** Fachereignis -> automatische Mail (z. B. anmeldung.bestaetigt -> anmeldebestaetigung) */
-  ereignisMails?: Record<string, string> };
+  ereignisMails?: Record<string, string>;
+  /** SSRF-Schutz fuer Webhook-Ziele (Default: DNS-Pruefung; Tests injizieren einen Stub) */
+  pruefeWebhookZiel?: (url: string) => Promise<void> };
 
 /** Ereignisse, die zusaetzlich zu Webhooks eine Mail an die betroffene Person ausloesen. */
 export const EREIGNIS_MAILS: Record<string, string> = {
@@ -36,7 +38,7 @@ export function standardHandler(pool: pg.Pool, deps: WorkerDeps): Record<string,
       }
       return n;
     },
-    'webhook.zustellung': (e) => stelleZu(pool, e, { fetch: deps.fetch }),
+    'webhook.zustellung': (e) => stelleZu(pool, e, { fetch: deps.fetch, pruefeZiel: deps.pruefeWebhookZiel }),
     mail: async (e) => deps.mail.sende(await rendereMail(pool, e.payload.vorlage, e.payload.daten ?? {}, e.payload.an ?? null)),
   };
 }

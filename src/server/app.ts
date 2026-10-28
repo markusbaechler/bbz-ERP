@@ -22,13 +22,23 @@ import { registerMahnwesenRoutes } from './routes/mahnwesen';
 import { registerSaqVerrechnungRoutes } from './routes/saqVerrechnung';
 
 export type AppOptionen = {
-  auth?: AuthKonfig; integration?: Partial<WorkerDeps>; publicLimits?: { lesenProMinute?: number; schreibenProMinute?: number };
+  auth?: AuthKonfig; integration?: Partial<WorkerDeps>; publicLimits?: { lesenProMinute?: number; schreibenProMinute?: number; lesenProIp?: number; schreibenProIp?: number };
   /** Wird fuer jede registrierte Route aufgerufen (Dokumentation: npm run api:routen). */
   beiRoute?: (methode: string, url: string) => void;
 };
 
 export function buildApp(pool: pg.Pool, opts: AppOptionen = {}): FastifyInstance {
-  const app = Fastify({ logger: false });
+  // TRUST_PROXY: hinter Azure/Reverse-Proxy die echte Client-IP fuer das Rate-Limit verwenden ("true" oder Anzahl Hops)
+  const tp = process.env.TRUST_PROXY;
+  const app = Fastify({ logger: false, trustProxy: tp === 'true' ? true : tp && /^\d+$/.test(tp) ? Number(tp) : false });
+  // Unerwartete Fehler nie mit Interna (SQL, SQLSTATE, Stack) beantworten (Security-Review Befund 2)
+  app.setErrorHandler((err, req, reply) => {
+    const status = (err as { statusCode?: number }).statusCode;
+    if (status && status >= 400 && status < 500) return reply.code(status).send({ error: err.message });
+    req.log.error(err);
+    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) console.error(err);
+    return reply.code(500).send({ error: 'Interner Fehler' });
+  });
   if (opts.beiRoute) app.addHook('onRoute', (r) => { for (const m of [r.method].flat()) opts.beiRoute!(m, r.url); });
   registriereAuth(app, pool, opts.auth ?? authKonfigAusEnv());
   registrierePublicSchutz(app, pool, opts.publicLimits);
@@ -38,6 +48,7 @@ export function buildApp(pool: pg.Pool, opts: AppOptionen = {}): FastifyInstance
     moodle: opts.integration?.moodle !== undefined ? opts.integration.moodle : moodleAusEnv(),
     mail: opts.integration?.mail ?? mailAusEnv(), fetch: opts.integration?.fetch,
     moodleTiming: opts.integration?.moodleTiming, ereignisMails: opts.integration?.ereignisMails,
+    pruefeWebhookZiel: opts.integration?.pruefeWebhookZiel,
   });
   app.get('/health', async () => ({ ok: true }));
   registriereStatisch(app);

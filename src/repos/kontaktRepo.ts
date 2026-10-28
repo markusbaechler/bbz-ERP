@@ -147,3 +147,19 @@ export async function listNewsletterEmpfaenger(db: Db): Promise<NewsletterEmpfae
      order by lower(k.nachname), lower(coalesce(k.vorname,'')), lower(k.email)`);
   return r.rows.map((x: any) => ({ email: x.email, anrede: x.anrede, vorname: x.vorname, nachname: x.nachname, organisation: x.organisation }));
 }
+
+/**
+ * Fuer anonyme Eingaben (Homepage, Formulare): bestehende Kontakte werden NIE veraendert (wer eine E-Mail kennt,
+ * darf keine Stammdaten aendern, z. B. Organisation -> Rechnungsempfaenger). Abweichende Angaben werden nur gemeldet,
+ * damit sie als Bemerkung zur Pruefung festgehalten werden koennen. Neue Kontakte werden normal angelegt.
+ */
+export async function kontaktAusOeffentlicherEingabe(db: Db, input: KontaktInput & { email: string }): Promise<{ kontakt: Kontakt; neu: boolean; abweichungen: string[] }> {
+  const vorhanden = await findKontaktByEmail(db, input.email);
+  if (!vorhanden) return { kontakt: await createKontakt(db, input), neu: true, abweichungen: [] };
+  const felder: [keyof KontaktInput & keyof Kontakt, string][] = [['vorname', 'Vorname'], ['nachname', 'Nachname'], ['anrede', 'Anrede'],
+    ['funktion', 'Funktion'], ['telefon', 'Telefon'], ['mobile', 'Mobile'], ['geburtsdatum', 'Geburtsdatum'], ['organisationId', 'Organisation']];
+  const abweichungen = felder
+    .filter(([k]) => input[k] !== undefined && input[k] !== null && input[k] !== '' && String(input[k]) !== String(vorhanden[k] ?? ''))
+    .map(([k, label]) => (k === 'organisationId' ? `${label} abweichend` : `${label}: ${String(input[k])}`));
+  return { kontakt: vorhanden, neu: false, abweichungen };
+}

@@ -19,7 +19,7 @@ const fake = new FakeMoodle();
 const mail = new ProtokollMailAdapter();
 const hooks: { url: string; ereignis: string }[] = [];
 const fetchHook = (async (url: string, init: RequestInit) => { hooks.push({ url, ereignis: (init.headers as any)['x-bbz-ereignis'] }); return new Response('ok'); }) as unknown as typeof fetch;
-const app = buildApp(pool, { integration: { moodle: new MoodleClient({ url: 'https://mybbz.test', token: fake.token, fetch: fake.fetch }), mail, fetch: fetchHook } });
+const app = buildApp(pool, { integration: { moodle: new MoodleClient({ url: 'https://mybbz.test', token: fake.token, fetch: fake.fetch }), mail, fetch: fetchHook, pruefeWebhookZiel: async () => {} } });
 const admin = { 'x-user-role': 'admin', 'x-user': 'ml' };
 const ORIGIN = 'https://www.bankenberatungszentrum.ch';
 let key: string; let durchfuehrungId: string; let code: string; let anmeldung1: string;

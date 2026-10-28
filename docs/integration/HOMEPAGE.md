@@ -58,7 +58,15 @@ $ereignis = json_decode($body, true); // {id, ereignis, zeitpunkt, daten}
 ```
 Nicht-2xx-Antworten werden mit Backoff wiederholt (1, 2, 4 … Minuten, maximal 8 Versuche); den Stand zeigt `/admin/outbox`.
 
-## 5. Datenschutz (nDSG)
+## 5. Schutzmassnahmen (Security-Review 28.10.2026)
+- **Rate-Limit** je Schlüssel und zusätzlich **je Absender-IP**: Standard 10 Anmeldungen/Anfragen und 120 Katalogabrufe pro Minute und IP. Hinter Azure oder einem Proxy muss `TRUST_PROXY` gesetzt sein.
+- Für stärker exponierte Formulare empfiehlt sich zusätzlich ein Captcha, z. B. Cloudflare Turnstile im Widget oder in WPForms [offen].
+- **Neutrale Antworten:** Eine Doppelanmeldung oder eine unbekannte bzw. nicht öffentliche Durchführung beantwortet die API mit `202 {status:"eingegangen"}`. So lässt sich nicht abfragen, wer angemeldet ist.
+- **Bestehende Kontakte** werden über die Homepage nie geändert. Abweichende Angaben landen als Bemerkung zur Prüfung.
+- **Steuerzeichen** in Eingaben werden abgelehnt (400). Interne Fehler antworten nur mit „Interner Fehler“.
+- **Webhooks:** nur `https`, keine internen Ziele (private IP-Bereiche, auch nach DNS-Auflösung), keine Weiterleitungen.
+
+## 6. Datenschutz (nDSG)
 - Die Public-API gibt **keine Personendaten** heraus, Antworten enthalten nur Status und Referenz.
 - Der Newsletter verlangt die Einwilligung, die mit Zeitpunkt und Quelle gespeichert wird.
 - Organisationen und Rechnungsempfänger werden **serverseitig** zugeordnet. IDs von aussen werden ignoriert.

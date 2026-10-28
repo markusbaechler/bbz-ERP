@@ -133,7 +133,7 @@ describe('Webhooks', () => {
     await pool.query(`insert into webhook_abo(name,url,secret,ereignisse) values ('Homepage','https://www.example.test/hook','s3cret',$1),('Alle','https://b.test/h','x','{*}'),('Andere','https://c.test/h','y','{rechnung.bezahlt}')`, [['anmeldung.bestaetigt']]);
     const empfangen: { url: string; headers: Record<string, string>; body: string }[] = [];
     const f = (async (url: string, init: RequestInit) => { empfangen.push({ url, headers: init.headers as Record<string, string>, body: String(init.body) }); return new Response('ok', { status: url.includes('b.test') ? 500 : 200 }); }) as unknown as typeof fetch;
-    const h = standardHandler(pool, { moodle: null, mail: new ProtokollMailAdapter(), fetch: f, ereignisMails: {} });
+    const h = standardHandler(pool, { moodle: null, mail: new ProtokollMailAdapter(), fetch: f, ereignisMails: {}, pruefeWebhookZiel: async () => {} });
     await publiziere(pool, 'anmeldung.bestaetigt', { anmeldungId: '00000000-0000-0000-0000-000000000001' });
     await verarbeiteOutbox(pool, h);           // Verteilung
     const r = await verarbeiteOutbox(pool, h); // Zustellungen

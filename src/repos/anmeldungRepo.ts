@@ -56,10 +56,13 @@ async function ermittleKontakt(c: Db, ref: KontaktReferenz): Promise<{ kontakt: 
   });
 }
 
+/** Doppelanmeldung derselben Person (409 intern; die Homepage antwortet neutral, um kein Teilnahme-Orakel zu bieten). */
+export class DoppelanmeldungError extends ConflictError {}
+
 async function pruefeKeineDoppelanmeldung(c: Db, durchfuehrungId: string, kontaktId: string): Promise<void> {
   const r = await c.query(
     `select 1 from anmeldung where durchfuehrung_id=$1 and kontakt_id=$2 and status <> 'storniert'`, [durchfuehrungId, kontaktId]);
-  if (r.rowCount) throw new ConflictError('Diese Person ist fuer die Durchfuehrung bereits angemeldet');
+  if (r.rowCount) throw new DoppelanmeldungError('Diese Person ist fuer die Durchfuehrung bereits angemeldet');
 }
 
 /** Rechnungsempfaenger-Default: bestellende Bank (Firmenkurs), sonst Debitor der Organisation des Kontakts. */

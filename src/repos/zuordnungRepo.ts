@@ -52,3 +52,11 @@ export async function auftraggeberZuOrganisation(db: Db, organisationId: string 
   const r = await db.query('select id from auftraggeber where organisation_id=$1 and aktiv', [organisationId]);
   return r.rowCount ? r.rows[0].id : null;
 }
+
+/** Buchbare oeffentliche Durchfuehrung per Code; null fuer unbekannte UND nicht-oeffentliche (keine Unterscheidung nach aussen). */
+export async function findeOeffentlicheDurchfuehrungPerCode(db: Db, code: string): Promise<string | null> {
+  const r = await db.query(
+    `select d.id from durchfuehrung d join kursangebot k on k.id=d.kursangebot_id
+     where upper(d.code)=upper($1) and d.oeffentlich and k.oeffentlich and k.aktiv`, [code.trim()]);
+  return r.rowCount ? r.rows[0].id : null;
+}

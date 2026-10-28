@@ -68,6 +68,9 @@ export function registriereAuth(app: FastifyInstance, pool: pg.Pool, konfig: Aut
     let ma = oid ? await findMitarbeitendeByEntraOid(pool, oid) : null;
     if (!ma && email) {
       ma = await findMitarbeitendeByEmail(pool, email);
+      // Ein bereits an eine andere Entra-Identitaet gebundenes Konto darf nicht ueber die E-Mail uebernommen werden
+      // (wiederverwendeter UPN, Gastkonto) – Security-Review Befund 5.
+      if (ma && ma.entraOid && ma.entraOid !== oid) return reply.code(403).send({ error: 'Konto ist an eine andere Entra-Identitaet gebunden' });
       if (ma && oid && !ma.entraOid) ma = await updateMitarbeitende(pool, ma.id, { entraOid: oid });
     }
     if (!ma || !ma.aktiv) return reply.code(403).send({ error: 'Kein freigeschaltetes bbz-Konto (Mitarbeitende)' });
