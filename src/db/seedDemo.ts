@@ -31,6 +31,7 @@ import { createSaqFall, planePruefung, erfasseResultat, setzeArbeitgeberbestaeti
 import { festschreiben } from '../repos/rechnungRepo';
 import { erfasseZahlung } from '../repos/debitorRepo';
 import { createApiClient } from '../repos/apiClientRepo';
+import { istEinstieg } from '../einstieg';
 
 const HEUTE = heuteIso();
 const tag = (n: number): string => {
@@ -311,7 +312,7 @@ export async function seedDemo(pool: pg.Pool, log: (s: string) => void = console
 }
 
 // CLI: `npm run seed:demo`
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (istEinstieg(import.meta.url)) {
   const pool = getPool();
   try {
     await runMigrations(pool);

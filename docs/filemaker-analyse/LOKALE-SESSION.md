@@ -21,6 +21,8 @@ Lies HANDOVER.md und docs/filemaker-analyse/ANLEITUNG.md.
 1. Erstelle per Computer Use im geöffneten FileMaker Pro Advanced den Datenbank-Designreport (Weg A):
    alle geöffneten Dateien, alle Tabellen, alle Elemente, Format XML, Ziel %USERPROFILE%\Documents\bbz-DDR.
 2. Führe aus: npm run fm:analyse -- "%USERPROFILE%\Documents\bbz-DDR" --out fm-analyse-out
+   (%USERPROFILE% gilt nur in cmd; Git Bash: "$USERPROFILE/Documents/bbz-DDR", PowerShell: "$env:USERPROFILE\Documents\bbz-DDR").
+   Erfolg nur, wenn "Bericht geschrieben: … (n offene Luecken)" erscheint. Bei Speichermangel: NODE_OPTIONS=--max-old-space-size=8192.
 3. Prüfe in fm-analyse-out/FUNKTIONSUMFANG.md das Kapitel "Lücken". Schliesse jede Lücke im ERP (TDD, Konventionen aus HANDOVER.md)
    oder begründe, warum sie entfällt.
 4. Ersetze die Tabelle in docs/filemaker-analyse/FUNKTIONSUMFANG-STAND.md durch die belegten Ergebnisse

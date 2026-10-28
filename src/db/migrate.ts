@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type pg from 'pg';
+import { istEinstieg } from '../einstieg';
 
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '../../db/migrations');
 
@@ -28,7 +29,7 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
 }
 
 // CLI: `npm run migrate`
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (istEinstieg(import.meta.url)) {
   const { getPool, closePool } = await import('./pool');
   await runMigrations(getPool());
   await closePool();

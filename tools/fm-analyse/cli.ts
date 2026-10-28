@@ -16,6 +16,7 @@ import { analysiere, liesErpSchema } from './analyse';
 import { berichtMarkdown, mappingEntwurf } from './report';
 import { sammleUeberDataApi } from './dataApi';
 import type { FmInventar } from './typen';
+import { istEinstieg } from '../../src/einstieg';
 
 function xmlDateien(pfad: string): string[] {
   if (statSync(pfad).isFile()) return [pfad];
@@ -65,7 +66,7 @@ export async function fuehreAusDataApi(argv: string[], env: NodeJS.ProcessEnv = 
   return schreibe(inv, argv, `Data API ${new URL(server).host} (${werte(argv, '--datenbank').join(', ')})`);
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+if (istEinstieg(import.meta.url)) {
   const argv = process.argv.slice(2);
   (argv.includes('--data-api') ? fuehreAusDataApi(argv) : Promise.resolve().then(() => fuehreAus(argv)))
     .then((r) => console.log(`Bericht geschrieben: ${r.out} (${r.luecken} offene Luecken)`))
