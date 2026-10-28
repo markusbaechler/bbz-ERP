@@ -1,7 +1,8 @@
 import type { Einsatz, EinsatzStatus } from '../domain/types';
 import { ValidationError, NotFoundError, ConflictError } from '../domain/errors';
 import { istUeberbucht, BELEGENDE_STATUS } from '../domain/einsatz';
-import { type Db, num } from './db';
+import { type Db, num, inTransaktion } from './db';
+import type pg from 'pg';
 
 const map = (r: any): Einsatz => ({
   id: r.id, referentId: r.referent_id, projektId: r.projekt_id, kurstagId: r.kurstag_id, datum: r.datum,
@@ -23,7 +24,16 @@ export async function verplanteTage(db: Db, referentId: string, datum: string, a
   return Number(r.rows[0].s);
 }
 
+const istClient = (db: Db): db is pg.PoolClient => 'release' in db;
+
+/** Serialisiert Belegungspruefung + Schreiben je Referent:in und Datum (sonst koennten parallele Requests ueberbuchen). */
+async function sperreBelegung(c: pg.PoolClient, referentId: string, datum: string): Promise<void> {
+  await c.query('select pg_advisory_xact_lock(hashtext($1))', [`einsatz:${referentId}:${datum}`]);
+}
+
 export async function createEinsatz(db: Db, input: EinsatzInput): Promise<Einsatz> {
+  if (!istClient(db)) return inTransaktion(db, (c) => createEinsatz(c, input));
+  await sperreBelegung(db, input.referentId, input.datum);
   const dauer = input.dauerTage ?? 1;
   if (!(dauer > 0 && dauer <= 1)) throw new ValidationError('dauerTage muss in (0, 1] liegen');
   const ref = await db.query('select aktiv, tagessatz_chf, halbtagessatz_chf from referent where id=$1', [input.referentId]);
@@ -50,7 +60,9 @@ export async function getEinsatz(db: Db, id: string): Promise<Einsatz> {
 }
 
 export async function setEinsatzStatus(db: Db, id: string, status: EinsatzStatus): Promise<Einsatz> {
+  if (!istClient(db)) return inTransaktion(db, (c) => setEinsatzStatus(c, id, status));
   const e = await getEinsatz(db, id);
+  await sperreBelegung(db, e.referentId, e.datum);
   if (status !== 'abgesagt' && e.status === 'abgesagt'
       && istUeberbucht(await verplanteTage(db, e.referentId, e.datum, e.id), e.dauerTage)) {
     throw new ConflictError(`Reaktivierung nicht moeglich: Referent ist am ${e.datum} bereits verplant`);

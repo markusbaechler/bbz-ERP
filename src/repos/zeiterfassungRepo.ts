@@ -50,7 +50,10 @@ export async function createZeiterfassung(db: Db, input: ZeiterfassungInput): Pr
   pruefeFelder(input, true);
   const ma = await db.query('select stundensatz_verrechnung from mitarbeitende where id=$1', [input.mitarbeitendeId]);
   if (!ma.rowCount) throw new NotFoundError('Mitarbeitende nicht gefunden');
-  await getProjektById(db, input.projektId);
+  const projekt = await getProjektById(db, input.projektId);
+  if (projekt.status === 'archiviert' || projekt.status === 'abgesagt') {
+    throw new ConflictError(`Auf ein ${projekt.status}es Projekt kann keine Zeit erfasst werden`);
+  }
   await pruefeAufgabe(db, input.aufgabeId, input.projektId);
   const ansatz = input.ansatzChf !== undefined ? input.ansatzChf : num(ma.rows[0].stundensatz_verrechnung);
   const r = await db.query(

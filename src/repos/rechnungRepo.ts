@@ -3,7 +3,8 @@ import type { Rechnung, Rechnungsposition } from '../domain/types';
 import { berechneMwst, rappenRunden } from '../domain/mwst';
 import { ValidationError, NotFoundError } from '../domain/errors';
 import { getProjektById } from './projektRepo';
-import type { Db } from './db';
+import { type Db, inTransaktion } from './db';
+import { audit } from './auditRepo';
 
 const mapR = (r: any): Rechnung => ({
   id: r.id, projektId: r.projekt_id, auftraggeberId: r.auftraggeber_id, datum: r.datum,
@@ -30,6 +31,17 @@ export async function getRechnung(pool: Db, id: string): Promise<Rechnung> {
   const r = await pool.query('select * from rechnung where id=$1', [id]);
   if (!r.rowCount) throw new NotFoundError(`Rechnung ${id} nicht gefunden`);
   return mapR(r.rows[0]);
+}
+
+export async function listRechnungen(pool: Db, f: { projektId?: string; auftraggeberId?: string; status?: string; jahr?: number } = {}): Promise<Rechnung[]> {
+  const args: unknown[] = []; const cond: string[] = [];
+  const add = (sql: string, v: unknown) => { args.push(v); cond.push(sql.replace('?', `$${args.length}`)); };
+  if (f.projektId) add('projekt_id=?', f.projektId);
+  if (f.auftraggeberId) add('auftraggeber_id=?', f.auftraggeberId);
+  if (f.status) add('status=?', f.status);
+  if (f.jahr) add('extract(year from datum)=?', f.jahr);
+  const r = await pool.query(`select * from rechnung ${cond.length ? 'where ' + cond.join(' and ') : ''} order by datum desc, lfd_nr desc nulls first limit 1000`, args);
+  return r.rows.map(mapR);
 }
 
 export async function listPositionen(pool: Db, rechnungId: string): Promise<Rechnungsposition[]> {
@@ -101,11 +113,24 @@ export async function setDefVereinbart(pool: pg.Pool, id: string): Promise<Rechn
   return mapR(upd.rows[0]);
 }
 
-export async function stornieren(pool: pg.Pool, id: string, _grund?: string): Promise<Rechnung> {
+/**
+ * Storno einer festgeschriebenen Rechnung. Nummer bleibt belegt (lueckenlos); verrechnete Leistungen
+ * (Zeiteintraege, Kurs-Anmeldungen, SAQ-Faelle) werden wieder freigegeben, damit sie korrigiert neu verrechnet werden koennen.
+ */
+export async function stornieren(pool: pg.Pool, id: string, grund?: string, benutzer?: string | null): Promise<Rechnung> {
   const r = await getRechnung(pool, id);
   if (r.status !== 'abgerechnet' && r.status !== 'bezahlt') {
     throw new ValidationError(`Storno nur aus abgerechnet/bezahlt (Status ${r.status})`);
   }
-  const upd = await pool.query(`update rechnung set status='storniert' where id=$1 returning *`, [id]);
-  return mapR(upd.rows[0]);
+  return inTransaktion(pool, async (c) => {
+    const upd = await c.query(`update rechnung set status='storniert' where id=$1 returning *`, [id]);
+    const z = await c.query(
+      `update zeiterfassung set rechnungsposition_id=null
+       where rechnungsposition_id in (select id from rechnungsposition where rechnung_id=$1)`, [id]);
+    const a = await c.query('update anmeldung set rechnung_id=null where rechnung_id=$1', [id]);
+    const f = await c.query('update saq_fall set rechnung_id=null where rechnung_id=$1', [id]);
+    await audit(c, { benutzer, aktion: 'storniert', entitaet: 'rechnung', entitaetId: id,
+      details: { grund: grund ?? null, freigegeben: { zeiteintraege: z.rowCount, anmeldungen: a.rowCount, saqFaelle: f.rowCount } } });
+    return mapR(upd.rows[0]);
+  });
 }
