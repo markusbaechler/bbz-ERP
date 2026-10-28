@@ -1,4 +1,5 @@
 import type { Kontakt, Interesse } from '../domain/types';
+import type { NewsletterEmpfaenger } from '../domain/crmTypes';
 import { ValidationError, NotFoundError, ConflictError } from '../domain/errors';
 import { type Db, patchSets } from './db';
 
@@ -108,10 +109,22 @@ export async function findOrCreateKontaktByEmail(db: Db, input: KontaktInput & {
   return { kontakt, neu: false };
 }
 
-export async function listKontakte(db: Db, filter: { organisationId?: string; suche?: string; inklArchiviert?: boolean; limit?: number } = {}): Promise<Kontakt[]> {
+export type KontaktFilter = {
+  organisationId?: string; suche?: string; inklArchiviert?: boolean; limit?: number;
+  /** Ein Wert der Interessen-Whitelist (nachwuchs, tailormade, ...). */
+  interesse?: string; betreuerId?: string; newsletter?: boolean;
+};
+
+export async function listKontakte(db: Db, filter: KontaktFilter = {}): Promise<Kontakt[]> {
   const cond: string[] = []; const args: unknown[] = [];
   if (!filter.inklArchiviert) cond.push('not archiviert');
   if (filter.organisationId) { args.push(filter.organisationId); cond.push(`organisation_id=$${args.length}`); }
+  if (filter.interesse) {
+    if (!INTERESSEN.includes(filter.interesse as Interesse)) throw new ValidationError(`Unbekanntes Interesse: ${filter.interesse}`);
+    args.push(filter.interesse); cond.push(`$${args.length} = any(interessen)`);
+  }
+  if (filter.betreuerId) { args.push(filter.betreuerId); cond.push(`betreuer_id=$${args.length}`); }
+  if (filter.newsletter !== undefined) { args.push(filter.newsletter); cond.push(`newsletter=$${args.length}`); }
   if (filter.suche?.trim()) {
     args.push(`%${filter.suche.trim().toLowerCase()}%`);
     cond.push(`(lower(nachname) like $${args.length} or lower(coalesce(vorname,'')) like $${args.length} or lower(coalesce(email,'')) like $${args.length})`);
@@ -120,4 +133,17 @@ export async function listKontakte(db: Db, filter: { organisationId?: string; su
   const where = cond.length ? `where ${cond.join(' and ')}` : '';
   const r = await db.query(`select * from kontakt ${where} order by lower(nachname), lower(vorname) limit $${args.length}`, args);
   return r.rows.map(mapKontakt);
+}
+
+/**
+ * Newsletter-Empfaenger fuer den Export (nDSG): nur aktive Kontakte mit E-Mail, Newsletter-Opt-in
+ * UND dokumentiertem Einwilligungszeitpunkt.
+ */
+export async function listNewsletterEmpfaenger(db: Db): Promise<NewsletterEmpfaenger[]> {
+  const r = await db.query(
+    `select k.email, k.anrede, k.vorname, k.nachname, o.name as organisation
+     from kontakt k left join organisation o on o.id = k.organisation_id
+     where k.newsletter and k.einwilligung_am is not null and not k.archiviert and k.email is not null
+     order by lower(k.nachname), lower(coalesce(k.vorname,'')), lower(k.email)`);
+  return r.rows.map((x: any) => ({ email: x.email, anrede: x.anrede, vorname: x.vorname, nachname: x.nachname, organisation: x.organisation }));
 }
