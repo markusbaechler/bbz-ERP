@@ -21,7 +21,9 @@ export function erzeugeRechnungPdf(rechnung: Rechnung, positionen: Rechnungsposi
   doc.text(`${auftraggeber.plz} ${auftraggeber.ort}`);
   doc.moveDown();
   // Meta
-  doc.fontSize(10).text(`Rechnungs-Nr.: ${rechnung.nummer ?? ''}`);
+  const gutschrift = rechnung.typ === 'gutschrift';
+  if (gutschrift) doc.font('Helvetica-Bold').fontSize(14).text('Gutschrift (Storno-Beleg)').font('Helvetica').moveDown(0.5);
+  doc.fontSize(10).text(`${gutschrift ? 'Gutschrift' : 'Rechnungs'}-Nr.: ${rechnung.nummer ?? ''}`);
   doc.text(`Datum: ${rechnung.datum}`);
   if (rechnung.betreff) doc.font('Helvetica-Bold').text(rechnung.betreff).font('Helvetica');
   doc.moveDown();
@@ -33,11 +35,13 @@ export function erzeugeRechnungPdf(rechnung: Rechnung, positionen: Rechnungsposi
   // MWSt-Zusammenfassung
   const e = berechneMwst(positionen.map((p) => ({ betrag: p.betragNetto, satz: p.mwstSatz })), rechnung.mwstModus);
   for (const z of e.proSatz) doc.text(`Netto ${z.netto.toFixed(2)} à ${z.satz}% = MWSt ${z.steuer.toFixed(2)}`);
-  doc.font('Helvetica-Bold').text(`Rechnungsbetrag: CHF ${e.totalBrutto.toFixed(2)}`).font('Helvetica');
+  doc.font('Helvetica-Bold').text(`${gutschrift ? 'Gutschriftsbetrag' : 'Rechnungsbetrag'}: CHF ${e.totalBrutto.toFixed(2)}`).font('Helvetica');
 
-  // QR-Zahlteil (Slip unten / eigene Seite)
-  const qr = new SwissQRBill(baueQrDaten(rechnung, auftraggeber));
-  qr.attachTo(doc);
+  // QR-Zahlteil (Slip unten / eigene Seite) – nicht bei Gutschriften (kein Zahlungsauftrag)
+  if (!gutschrift) {
+    const qr = new SwissQRBill(baueQrDaten(rechnung, auftraggeber));
+    qr.attachTo(doc);
+  }
 
   doc.end();
   return fertig;

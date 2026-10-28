@@ -36,7 +36,18 @@ describe('Korrekturen nach Modul-Review', () => {
     expect(neu.json().rechnung.totalNetto).toBe(5 * 220);
     const log = await pool.query(`select details from audit_log where aktion='storniert' and entitaet_id=$1`, [rechnungId]);
     expect(log.rows[0].details).toMatchObject({ grund: 'falscher Ansatz', freigegeben: { zeiteintraege: 1 } });
-    expect((await app.inject({ method: 'GET', url: `/rechnung?projektId=${base.projekt.id}` })).json()).toHaveLength(2);
+    const liste = (await app.inject({ method: 'GET', url: `/rechnung?projektId=${base.projekt.id}` })).json();
+    expect(liste).toHaveLength(3);                                   // Original, Gutschrift, Neuverrechnung
+    const g = s.json().gutschrift;
+    expect(g).toMatchObject({ typ: 'gutschrift', bezugRechnungId: rechnungId, status: 'storniert', totalNetto: -880, totalBrutto: -951.3 });
+    expect(g.lfdNr).toBe(s.json().lfdNr + 1);                        // lueckenlos aus demselben Zaehler
+    expect(g.nummer).toMatch(/ G ml$/);
+    const gPos = (await app.inject({ method: 'GET', url: `/rechnung/${g.id}` })).json().positionen;
+    expect(gPos.map((p: any) => p.betragNetto)).toEqual([-880]);
+    const pdf = await app.inject({ method: 'GET', url: `/rechnung/${g.id}/pdf` });
+    expect(pdf.statusCode).toBe(200);
+    expect(pdf.headers['content-type']).toBe('application/pdf');
+    expect((await app.inject({ method: 'POST', url: `/rechnung/${g.id}/stornieren`, headers: admin, payload: {} })).statusCode).toBe(400);
   });
 
   it('Storno nur fuer Admin', async () => {

@@ -34,6 +34,8 @@ export type Rechnung = {
   betreff: string | null; mwstModus: 'exkl' | 'inkl'; waehrung: string;
   lfdNr: number | null; nummer: string | null; status: RechnungStatus;
   totalNetto: number; totalMwst: number; totalBrutto: number;
+  /** 'gutschrift' = Storno-Beleg zur Rechnung bezugRechnungId */
+  typ?: 'rechnung' | 'gutschrift'; bezugRechnungId?: string | null;
 };
 
 export type Zahlungseingang = {

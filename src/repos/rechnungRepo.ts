@@ -11,6 +11,7 @@ const mapR = (r: any): Rechnung => ({
   betreff: r.betreff, mwstModus: r.mwst_modus, waehrung: r.waehrung,
   lfdNr: r.lfd_nr === null ? null : Number(r.lfd_nr), nummer: r.nummer, status: r.status,
   totalNetto: Number(r.total_netto), totalMwst: Number(r.total_mwst), totalBrutto: Number(r.total_brutto),
+  typ: r.typ ?? 'rechnung', bezugRechnungId: r.bezug_rechnung_id ?? null,
 });
 
 const mapP = (r: any): Rechnungsposition => ({
@@ -114,23 +115,42 @@ export async function setDefVereinbart(pool: pg.Pool, id: string): Promise<Rechn
 }
 
 /**
- * Storno einer festgeschriebenen Rechnung. Nummer bleibt belegt (lueckenlos); verrechnete Leistungen
- * (Zeiteintraege, Kurs-Anmeldungen, SAQ-Faelle) werden wieder freigegeben, damit sie korrigiert neu verrechnet werden koennen.
+ * Storno einer festgeschriebenen Rechnung (Spec v1 §6.1): die Rechnung wird storniert und ein **Storno-Beleg**
+ * (Gutschrift) mit eigener, lueckenloser Nummer erstellt. Positionen und Totale werden exakt gespiegelt (nicht neu
+ * gerundet), damit MWSt-Korrektur und Originalbeleg sich auf den Rappen aufheben. Verrechnete Leistungen
+ * (Zeiteintraege, Kurs-Anmeldungen, SAQ-Faelle) werden fuer eine korrigierte Neuverrechnung freigegeben.
  */
-export async function stornieren(pool: pg.Pool, id: string, grund?: string, benutzer?: string | null): Promise<Rechnung> {
+export async function stornieren(pool: pg.Pool, id: string, grund?: string, benutzer?: string | null): Promise<Rechnung & { gutschrift: Rechnung }> {
   const r = await getRechnung(pool, id);
+  if (r.typ === 'gutschrift') throw new ValidationError('Eine Gutschrift kann nicht storniert werden');
   if (r.status !== 'abgerechnet' && r.status !== 'bezahlt') {
     throw new ValidationError(`Storno nur aus abgerechnet/bezahlt (Status ${r.status})`);
   }
   return inTransaktion(pool, async (c) => {
+    const gesperrt = await c.query(`select status from rechnung where id=$1 for update`, [id]);
+    if (gesperrt.rows[0].status === 'storniert') throw new ValidationError('Rechnung ist bereits storniert');
     const upd = await c.query(`update rechnung set status='storniert' where id=$1 returning *`, [id]);
+    const lfd: number = (await c.query(`update zaehler set wert = wert + 1 where name='rechnung_lfd_nr' returning wert`)).rows[0].wert;
+    const projekt = await getProjektById(c, r.projektId);
+    const g = await c.query(
+      `insert into rechnung(projekt_id,auftraggeber_id,datum,betreff,mwst_modus,waehrung,lfd_nr,nummer,status,total_netto,total_mwst,total_brutto,
+         festgeschrieben_am,typ,bezug_rechnung_id)
+       values ($1,$2,current_date,$3,$4,$5,$6,$7,'storniert',$8,$9,$10,now(),'gutschrift',$11) returning *`,
+      [r.projektId, r.auftraggeberId, `Gutschrift zu Rechnung ${r.nummer}${grund ? ` (${grund})` : ''}`, r.mwstModus, r.waehrung, lfd,
+       `${projekt.nummer} - ${lfd} G${benutzer ? ' ' + benutzer : ''}`, -r.totalNetto, -r.totalMwst, -r.totalBrutto, id]);
+    await c.query(
+      `insert into rechnungsposition(rechnung_id,position,beschreibung,menge,einheit,einzelpreis,mwst_satz,konto_id,betrag_netto)
+       select $2, position, beschreibung, menge, einheit, -einzelpreis, mwst_satz, konto_id, -betrag_netto from rechnungsposition where rechnung_id=$1`,
+      [id, g.rows[0].id]);
     const z = await c.query(
       `update zeiterfassung set rechnungsposition_id=null
        where rechnungsposition_id in (select id from rechnungsposition where rechnung_id=$1)`, [id]);
     const a = await c.query('update anmeldung set rechnung_id=null where rechnung_id=$1', [id]);
     const f = await c.query('update saq_fall set rechnung_id=null where rechnung_id=$1', [id]);
+    const bezahlt = Number((await c.query('select coalesce(sum(betrag),0) as s from zahlungseingang where rechnung_id=$1', [id])).rows[0].s);
     await audit(c, { benutzer, aktion: 'storniert', entitaet: 'rechnung', entitaetId: id,
-      details: { grund: grund ?? null, freigegeben: { zeiteintraege: z.rowCount, anmeldungen: a.rowCount, saqFaelle: f.rowCount } } });
-    return mapR(upd.rows[0]);
+      details: { grund: grund ?? null, gutschriftId: g.rows[0].id, gutschriftNummer: g.rows[0].nummer, rueckerstattungOffenChf: bezahlt,
+        freigegeben: { zeiteintraege: z.rowCount, anmeldungen: a.rowCount, saqFaelle: f.rowCount } } });
+    return { ...mapR(upd.rows[0]), gutschrift: mapR(g.rows[0]) };
   });
 }
