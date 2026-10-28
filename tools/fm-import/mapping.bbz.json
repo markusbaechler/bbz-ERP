@@ -1,0 +1,28 @@
+{
+  "_hinweis": "ERP-Feld -> Spaltenname im Seriendruck-Export (.mer) der bbz-FileMaker-Loesung. Quelle: Script-Ausdruck vom 28.10.2026 (Feldnamen, die Scripts als <Datei>::<Feld> nennen) [belegt: Script-Ausdruck]; Eintraege mit [Hypothese] stammen aus Layoutbeschriftungen und sind gegen die Kopfzeile des ersten echten Exports zu pruefen. fm-import meldet fehlende Pflichtfelder vor dem Lauf (pruefeMapping).",
+  "_offen": [
+    "rechnungen.totalBrutto: Feld fuer das Rechnungstotal in Faktura_P nennt kein Script; aus der Export-Kopfzeile ergaenzen (Alternative: Debitorenliste der Datei VESR, Felder 'Fakt. Nr.', 'Datum Rechnung', 'Betrag').",
+    "mitarbeitende: keine eigene Datei; Kuerzel stehen in Projekte::'Referent intern' und in Standard ('Mitarbeiter (Statistik)'). Mitarbeitende vorab im ERP anlegen.",
+    "kontakte: zweiter Lauf mit Personen.mer (Ansprechpersonen der Adressen; 'Name', 'Personen_Nr.'); E-Mail und Telefon liegen dort in der Datei Kommunik (Art/Telefon) und muessen fuer den Export verknuepft werden."
+  ],
+  "auftraggeber": {
+    "datei": "Adressen.mer",
+    "_quelle": "nummer [belegt: Adressen::Kunden Nr.]; name, strasse, plz, ort [Hypothese: Layout 'Datenerfassung' (Firma, Strasse/Postfach, Land/PLZ/Ort)]",
+    "felder": { "nummer": "Kunden Nr.", "name": "Firma", "strasse": "Strasse", "plz": "PLZ", "ort": "Ort" }
+  },
+  "projekte": {
+    "datei": "Projekte.mer",
+    "_quelle": "nummer, name, jahr, kontoNummer [belegt: Projekte::Projekt_Nr., Projekt_Name, Jahr, Konto]; auftraggeberNummer [Hypothese: Layout 'Projekterfassung', Beschriftung 'Auftraggeber-Nr.']",
+    "felder": { "nummer": "Projekt_Nr.", "name": "Projekt_Name", "jahr": "Jahr", "kontoNummer": "Konto", "auftraggeberNummer": "Auftraggeber-Nr." }
+  },
+  "kontakte": {
+    "datei": "Teilnehmer.mer",
+    "_quelle": "[belegt: Teilnehmer::Name, Vorname, eMail]",
+    "felder": { "nachname": "Name", "vorname": "Vorname", "email": "eMail" }
+  },
+  "rechnungen": {
+    "datei": "Faktura_P.mer",
+    "_quelle": "lfdNr, projektNummer [belegt: Faktura_P::Rechnung Nr., Projekt_Nr.]; datum [belegt: Faktura_P::Erfassungsdatum, Hypothese: = Rechnungsdatum]",
+    "felder": { "lfdNr": "Rechnung Nr.", "projektNummer": "Projekt_Nr.", "datum": "Erfassungsdatum" }
+  }
+}

@@ -36,6 +36,29 @@ export type Bericht = {
 };
 
 const TABELLEN: Tabelle[] = ['mitarbeitende', 'auftraggeber', 'projekte', 'kontakte', 'rechnungen'];
+
+/** ERP-Felder, die der Import je Tabelle liest (Projekte: nummer ODER stammnummer + jahr). */
+const MAPPING_FELDER: Record<Tabelle, { pflicht: string[]; optional: string[] }> = {
+  mitarbeitende: { pflicht: ['kuerzel', 'nachname'], optional: ['vorname', 'email', 'rolle'] },
+  auftraggeber: { pflicht: ['nummer', 'name'], optional: ['strasse', 'plz', 'ort', 'land', 'email', 'telefon', 'ansprechperson'] },
+  projekte: { pflicht: ['name', 'auftraggeberNummer'], optional: ['nummer', 'stammnummer', 'jahr', 'kontoNummer', 'status', 'bereich', 'budgetChf', 'budgetTage', 'beschrieb'] },
+  kontakte: { pflicht: ['nachname'], optional: ['vorname', 'anrede', 'email', 'funktion', 'telefon', 'mobile', 'organisation', 'bemerkung'] },
+  rechnungen: { pflicht: ['lfdNr', 'projektNummer', 'totalBrutto', 'datum'], optional: ['totalNetto', 'bezahlt', 'bezahltAm', 'nummer', 'betreff'] },
+};
+
+/** Prueft ein Mapping vor dem Lauf: unbekannte Tabellen/Felder und fehlende Pflichtfelder. Schluessel mit "_" sind Kommentare. */
+export function pruefeMapping(mapping: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  for (const [t, m] of Object.entries(mapping)) {
+    if (t.startsWith('_')) continue;
+    const def = MAPPING_FELDER[t as Tabelle];
+    if (!def) { out.push(`${t}: unbekannte Tabelle`); continue; }
+    const felder = Object.keys((m as TabellenMapping)?.felder ?? {});
+    for (const f of felder) if (!def.pflicht.includes(f) && !def.optional.includes(f)) out.push(`${t}.${f}: unbekanntes ERP-Feld`);
+    for (const f of def.pflicht) if (!felder.includes(f)) out.push(`${t}.${f}: Pflichtfeld ohne Zuordnung`);
+  }
+  return out;
+}
 const leer = () => ({ gelesen: 0, neu: 0, vorhanden: 0, fehler: 0 });
 
 class Zeilenfehler extends Error {}

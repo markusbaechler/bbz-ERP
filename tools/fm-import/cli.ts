@@ -7,13 +7,14 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { getPool, closePool } from '../../src/db/pool';
 import { runMigrations } from '../../src/db/migrate';
-import { importiere, berichtMarkdown, type Mapping, type Quellen, type Tabelle } from './import';
+import { importiere, berichtMarkdown, pruefeMapping, type Mapping, type Quellen, type Tabelle } from './import';
 
 function arg(name: string): string | undefined { const i = process.argv.indexOf(name); return i >= 0 ? process.argv[i + 1] : undefined; }
 
 async function main() {
   const ordner = resolve(arg('--ordner') ?? '.');
   const mapping = JSON.parse(readFileSync(resolve(arg('--mapping') ?? 'tools/fm-import/mapping.beispiel.json'), 'utf8')) as Mapping;
+  for (const w of pruefeMapping(mapping)) console.warn(`Mapping: ${w}`);
   const quellen: Quellen = {};
   for (const [t, m] of Object.entries(mapping) as [Tabelle, any][]) {
     if (!m?.datei) continue;
