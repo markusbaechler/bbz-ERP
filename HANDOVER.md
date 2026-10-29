@@ -34,7 +34,7 @@ TypeScript · Fastify 4 · PostgreSQL 16 (`pg`) · vitest · Vanilla-JS-PWA (`we
 ```bash
 docker compose up -d          # Postgres auf localhost:5433 (bbz/bbz)
 npm install
-npm test                      # 79 Suiten / 558 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
+npm test                      # 80 Suiten / 560 Tests (DB noetig); Browser-Test des Widgets nur mit installiertem Playwright
 npx tsc --noEmit
 npm run demo:neu && npm run demo   # Testumgebung: eigene DB bbz_demo, Testdaten, http://localhost:3000/app/ (README)
 npm run worker                # Outbox (Moodle, Webhooks, Mail)
