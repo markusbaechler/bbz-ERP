@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:16
+    # Nach einem Neustart von Docker wieder hochfahren (sonst fehlt die DB fuer Tests und Testumgebung)
+    restart: unless-stopped
     environment:
       POSTGRES_USER: bbz
       POSTGRES_PASSWORD: bbz
